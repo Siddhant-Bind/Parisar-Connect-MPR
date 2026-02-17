@@ -55,26 +55,62 @@ enum VisitorStatus {
 
 // Models
 
-model User {
-  id        String   @id @default(uuid()) // Can map to Supabase auth.users.id manually if needed, or just be a profile ID
-  email     String   @unique
+// NEW: Society Model for Multi-Society Support
+model Society {
+  id        String   @id @default(uuid())
   name      String
-  role      Role     @default(RESIDENT)
-  password  String?  // Keeping for now if transitioning gradually, but plan is Supabase Auth. With Supabase Auth, this might be redundant or removed.
-  // Actually, if using Supabase Auth, we don't store passwords here. But let's keep the structure flexible.
-  // Ideally this table is a "Profile" table linked to auth.users.
-  
-  wing       String?
-  flatNumber String?
-  refreshToken String?
-
+  address   String?
+  creatorId String   // Creator Admin (special permissions)
+  isActive  Boolean  @default(true)
+  deletedAt DateTime? // Soft delete
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  users      User[]
+  notices    Notice[]
   complaints Complaint[]
   payments   Payment[]
-  visitorLogs Visitor[] @relation("EnteredBy")
+  visitors   Visitor[]
 
+  @@index([creatorId])
+  @@index([deletedAt])
+  @@map("societies")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  name           String
+  role           Role     @default(RESIDENT)
+  password       String? // Supabase handles auth, this is optional
+  
+  // Society relation
+  societyId      String
+  society        Society  @relation(fields: [societyId], references: [id])
+  
+  // Resident-specific fields
+  wing           String?
+  flatNumber     String?
+  contact        String? // Phone number
+  
+  // Authentication & Security
+  mustChangePassword Boolean @default(false) // Force password change on first login
+  isApprovedAdmin    Boolean @default(false) // For admins: requires Creator approval
+  refreshToken       String?
+  
+  // Soft delete
+  deletedAt      DateTime?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  complaints     Complaint[]
+  payments       Payment[]
+  visitorLogs    Visitor[] @relation("EnteredBy")
+
+  @@index([societyId, role])
+  @@index([email])
+  @@index([deletedAt])
   @@map("users")
 }
 
@@ -84,9 +120,19 @@ model Notice {
   content   String
   type      NoticeType     @default(INFO)
   priority  NoticePriority @default(LOW)
+  
+  // Society relation
+  societyId String
+  society   Society  @relation(fields: [societyId], references: [id])
+  
+  // Soft delete
+  deletedAt DateTime?
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([societyId, createdAt])
+  @@index([deletedAt])
   @@map("notices")
 }
 
@@ -98,14 +144,24 @@ model Complaint {
   priority    ComplaintPriority @default(MEDIUM)
   status      ComplaintStatus   @default(OPEN)
   
-  history     Json?    // Array of status changes { status, remark, updatedAt }
+  history     Json?    // Array of status changes { status, remark, updatedAt, updatedBy }
 
   residentId  String
   resident    User     @relation(fields: [residentId], references: [id])
-
+  
+  // Society relation
+  societyId   String
+  society     Society  @relation(fields: [societyId], references: [id])
+  
+  // Soft delete
+  deletedAt   DateTime?
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@index([societyId, status])
+  @@index([residentId])
+  @@index([deletedAt])
   @@map("complaints")
 }
 
@@ -119,32 +175,57 @@ model Payment {
 
   residentId String
   resident   User     @relation(fields: [residentId], references: [id])
-
+  
+  // Society relation
+  societyId  String
+  society    Society  @relation(fields: [societyId], references: [id])
+  
+  // Soft delete
+  deletedAt  DateTime?
+  
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  @@index([societyId, status])
+  @@index([residentId, status])
+  @@index([deletedAt])
   @@map("payments")
 }
 
 model Visitor {
-  id         String   @id @default(uuid())
-  name       String
-  purpose    String
-  wing       String
-  flatNumber String
+  id            String   @id @default(uuid())
+  name          String
+  purpose       String
+  wing          String
+  flatNumber    String
+  contact       String? // Visitor phone number
   
-  entryTime  DateTime @default(now())
-  exitTime   DateTime?
-  status     VisitorStatus @default(ENTERED)
+  entryTime     DateTime @default(now())
+  exitTime      DateTime?
+  status        VisitorStatus @default(ENTERED)
   documentImage String? // URL or Base64 of scanned document
-  visitorType String?   @default("Guest") // Guest, Delivery, Staff
+  visitorType   String?   @default("Guest") // Guest, Delivery, Staff
   vehicleNumber String?
+  
+  // Walk-in flag: true = guard added directly, false = resident pre-approved
+  isWalkIn      Boolean  @default(true)
 
-  enteredBy  String?
-  creator    User?    @relation("EnteredBy", fields: [enteredBy], references: [id])
+  enteredBy     String?
+  creator       User?    @relation("EnteredBy", fields: [enteredBy], references: [id])
+  
+  // Society relation
+  societyId     String
+  society       Society  @relation(fields: [societyId], references: [id])
+  
+  // Soft delete
+  deletedAt     DateTime?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
+  @@index([societyId, entryTime])
+  @@index([status])
+  @@index([isWalkIn])
+  @@index([deletedAt])
   @@map("visitors")
 }
