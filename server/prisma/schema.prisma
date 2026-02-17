@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Enums
+enum Role {
+  ADMIN
+  RESIDENT
+  GUARD
+}
+
+enum ComplaintStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+}
+
+enum ComplaintPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum NoticeType {
+  INFO
+  EVENT
+  ALERT
+}
+
+enum NoticePriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+enum VisitorStatus {
+  PENDING
+  APPROVED
+  ENTERED
+  EXITED
+}
+
+// Models
+
+model User {
+  id        String   @id @default(uuid()) // Can map to Supabase auth.users.id manually if needed, or just be a profile ID
+  email     String   @unique
+  name      String
+  role      Role     @default(RESIDENT)
+  password  String?  // Keeping for now if transitioning gradually, but plan is Supabase Auth. With Supabase Auth, this might be redundant or removed.
+  // Actually, if using Supabase Auth, we don't store passwords here. But let's keep the structure flexible.
+  // Ideally this table is a "Profile" table linked to auth.users.
+  
+  wing       String?
+  flatNumber String?
+  refreshToken String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  complaints Complaint[]
+  payments   Payment[]
+  visitorLogs Visitor[] @relation("EnteredBy")
+
+  @@map("users")
+}
+
+model Notice {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  type      NoticeType     @default(INFO)
+  priority  NoticePriority @default(LOW)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("notices")
+}
+
+model Complaint {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  category    String
+  priority    ComplaintPriority @default(MEDIUM)
+  status      ComplaintStatus   @default(OPEN)
+  
+  history     Json?    // Array of status changes { status, remark, updatedAt }
+
+  residentId  String
+  resident    User     @relation(fields: [residentId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("complaints")
+}
+
+model Payment {
+  id         String   @id @default(uuid())
+  type       String   // e.g., "maintenance", "event"
+  amount     Float
+  status     PaymentStatus @default(PENDING)
+  dueDate    DateTime
+  month      String?
+
+  residentId String
+  resident   User     @relation(fields: [residentId], references: [id])
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("payments")
+}
+
+model Visitor {
+  id         String   @id @default(uuid())
+  name       String
+  purpose    String
+  wing       String
+  flatNumber String
+  
+  entryTime  DateTime @default(now())
+  exitTime   DateTime?
+  status     VisitorStatus @default(ENTERED)
+  documentImage String? // URL or Base64 of scanned document
+  visitorType String?   @default("Guest") // Guest, Delivery, Staff
+  vehicleNumber String?
+
+  enteredBy  String?
+  creator    User?    @relation("EnteredBy", fields: [enteredBy], references: [id])
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("visitors")
+}
