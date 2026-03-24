@@ -9,79 +9,62 @@ import {
   Bell,
   CreditCard,
   TrendingUp,
-  ChevronRight,
   Plus,
   Building2,
-  CheckCircle2,
   Clock,
   Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
-import api from "@/lib/api";
+import { useDashboardStats } from "@/hooks/useQueries";
+import { safeParseJSON } from "@/lib/utils";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [stats, setStats] = useState({
+  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
+  const { data: fetchedStats, isLoading: loading } = useDashboardStats();
+  const stats = fetchedStats || {
     totalResidents: 0,
     openComplaints: 0,
     pendingPayments: 0,
     collectionRate: 0,
     visitorsToday: 0,
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await api.get("/admin/dashboard");
-        if (response.data.success) {
-          setStats(response.data.data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch dashboard stats", error);
-        toast.error("Failed to load dashboard stats");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
-  }, []);
+    currentVisitors: 0,
+    pendingApprovals: 0,
+  };
 
   const statCards = [
     {
       title: "Total Residents",
       value: stats.totalResidents.toString(),
       icon: Users,
-      trend: "+4% from last month",
-      color: "bg-soft-peach", // Light orange for residents
+      trend: `${stats.currentVisitors} visitors active`,
+      color: "bg-soft-peach",
     },
     {
       title: "Open Complaints",
       value: stats.openComplaints.toString(),
       icon: Bell,
-      trend: "3 urgent",
-      color: "bg-mint-green", // Soft green for status
+      trend: `${stats.pendingApprovals} pending approvals`,
+      color: "bg-mint-green",
     },
     {
       title: "Pending Payments",
       value: stats.pendingPayments.toString(),
       icon: CreditCard,
       trend: `${stats.collectionRate}% collected`,
-      color: "bg-light-yellow", // Warning yellow
+      color: "bg-light-yellow",
     },
     {
       title: "Visitors Today",
       value: stats.visitorsToday.toString(),
       icon: Shield,
-      trend: "Active now",
-      color: "bg-lavender-mist", // Soft purple
+      trend: `${stats.currentVisitors} currently inside`,
+      color: "bg-lavender-mist",
     },
   ];
 
   return (
-    <DashboardLayout role="admin" userName="Admin User">
+    <DashboardLayout role="admin" userName={user.name || "Admin"}>
       <div className="space-y-6 pb-20 lg:pb-0">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in-up">
@@ -91,7 +74,7 @@ const AdminDashboard = () => {
             </h1>
             <p className="text-muted-foreground flex items-center gap-2">
               <Building2 className="w-4 h-4" />
-              Sunshine Residency
+              {user.society?.name || "Your Society"}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -103,7 +86,10 @@ const AdminDashboard = () => {
               <Bell className="w-4 h-4 mr-2" />
               Manage Notices
             </Button>
-            <Button className="rounded-xl bg-gradient-warm text-primary-foreground shadow-button btn-press">
+            <Button
+              className="rounded-xl bg-gradient-warm text-primary-foreground shadow-button btn-press"
+              onClick={() => navigate("/dashboard/admin/residents")}
+            >
               <Plus className="w-4 h-4 mr-2" />
               Add Resident
             </Button>
@@ -142,14 +128,6 @@ const AdminDashboard = () => {
                     )}
                     {stat.trend}
                   </p>
-                  {/* This button was incorrectly placed and caused the JSX error */}
-                  {/* <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 rounded-lg h-8"
-                      >
-                        Decline
-                      </Button> */}
                 </CardContent>
               </Card>
             ))}
@@ -162,13 +140,24 @@ const AdminDashboard = () => {
             <CardTitle className="text-lg font-bold flex items-center gap-2">
               <Clock className="w-5 h-5 text-warm-orange" />
               Pending Approvals
+              {stats.pendingApprovals > 0 && (
+                <Badge className="bg-warm-orange text-xs ml-2">
+                  {stats.pendingApprovals}
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <p className="text-sm text-muted-foreground p-4 text-center">
-                No pending approvals.
-              </p>
+              {stats.pendingApprovals === 0 ? (
+                <p className="text-sm text-muted-foreground p-4 text-center">
+                  No pending approvals.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground p-4 text-center">
+                  {stats.pendingApprovals} pre-approved visitors awaiting entry.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -197,13 +186,13 @@ const AdminDashboard = () => {
                   label: "Send Notice",
                   icon: Bell,
                   color: "bg-light-yellow",
-                  path: "/dashboard/admin/announcements",
+                  path: "/dashboard/admin/notices",
                 },
                 {
-                  label: "View Reports",
-                  icon: TrendingUp,
+                  label: "View Payments",
+                  icon: CreditCard,
                   color: "bg-soft-peach/60",
-                  path: "/dashboard/admin/reports",
+                  path: "/dashboard/admin/payments",
                 },
               ].map((action) => (
                 <button

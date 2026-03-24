@@ -1,5 +1,6 @@
 import React from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
+import { safeParseJSON } from "@/lib/utils";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,39 +15,55 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   allowedRoles,
 }) => {
-  // Get user from localStorage (set during login)
-  const userStr = localStorage.getItem("user");
+  // Hooks must be called unconditionally, before any early returns
+  const location = useLocation();
 
-  if (!userStr) {
+  // Get user from localStorage (set during login)
+  const user = safeParseJSON<{
+    role?: string;
+    societyId?: string;
+    mustChangePassword?: boolean;
+  } | null>(localStorage.getItem("user"), null);
+
+  if (!user) {
     // Not authenticated - redirect to login
     return <Navigate to="/login" replace />;
   }
 
-  try {
-    const user = JSON.parse(userStr);
-
-    if (!user.role) {
-      // Invalid user object - redirect to login
-      return <Navigate to="/login" replace />;
-    }
-
-    if (!allowedRoles.includes(user.role)) {
-      // User doesn't have permission - redirect to unauthorized or their dashboard
-      const dashboardMap: Record<string, string> = {
-        ADMIN: "/dashboard/admin",
-        RESIDENT: "/dashboard/resident",
-        GUARD: "/dashboard/guard",
-      };
-
-      const userDashboard = dashboardMap[user.role] || "/";
-      return <Navigate to={userDashboard} replace />;
-    }
-
-    // User is authenticated and has correct role
-    return <>{children}</>;
-  } catch (error) {
-    // Error parsing user data - redirect to login
-    localStorage.removeItem("user");
+  if (!user.role) {
+    // Invalid user object - redirect to login
     return <Navigate to="/login" replace />;
   }
+
+  // Force password change if required
+  if (user.mustChangePassword) {
+    return <Navigate to="/change-password" replace />;
+  }
+
+  // Admin without a society cannot access dashboard — redirect to create/join
+  // Skip this check if already on the create or join society pages to prevent infinite loop
+  if (
+    user.role === "ADMIN" &&
+    !user.societyId &&
+    !location.pathname.startsWith("/create-society") &&
+    !location.pathname.startsWith("/join-society")
+  ) {
+    return <Navigate to="/create-society" replace />;
+  }
+
+  if (!allowedRoles.includes(user.role)) {
+    // User doesn't have permission - redirect to their dashboard
+    const dashboardMap: Record<string, string> = {
+      ADMIN: "/dashboard/admin",
+      RESIDENT: "/dashboard/resident",
+      GUARD: "/dashboard/guard",
+    };
+
+    const userDashboard = dashboardMap[user.role] || "/";
+    return <Navigate to={userDashboard} replace />;
+  }
+
+  // User is authenticated and has correct role
+  return <>{children}</>;
 };
+

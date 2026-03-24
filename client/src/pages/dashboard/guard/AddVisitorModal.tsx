@@ -28,7 +28,7 @@ export default function AddVisitorModal({
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    purpose: "",
+    purpose: "Guest",
     wing: "",
     flatNumber: "",
     contact: "",
@@ -62,7 +62,7 @@ export default function AddVisitorModal({
       // Reset form
       setFormData({
         name: "",
-        purpose: "",
+        purpose: "Guest",
         wing: "",
         flatNumber: "",
         contact: "",
@@ -88,7 +88,7 @@ export default function AddVisitorModal({
             <Input
               id="name"
               required
-              placeholder="Enter name"
+              placeholder="Enter your name"
               className="bg-gray-100 border-transparent focus:bg-white transition-colors"
               value={formData.name}
               onChange={(e) =>
@@ -103,7 +103,7 @@ export default function AddVisitorModal({
               <Input
                 id="contact"
                 value={formData.contact}
-                placeholder="98765-43210"
+                placeholder="+91"
                 className="bg-gray-100 border-transparent focus:bg-white transition-colors"
                 onChange={(e) =>
                   setFormData({ ...formData, contact: e.target.value })
@@ -115,7 +115,7 @@ export default function AddVisitorModal({
               <div className="flex gap-2">
                 <Input
                   id="wing"
-                  placeholder="Wing"
+                  placeholder=""
                   className="w-20 bg-gray-100 border-transparent focus:bg-white transition-colors"
                   required
                   value={formData.wing}
@@ -125,7 +125,7 @@ export default function AddVisitorModal({
                 />
                 <Input
                   id="flat"
-                  placeholder="Flat No."
+                  placeholder=""
                   className="flex-1 bg-gray-100 border-transparent focus:bg-white transition-colors"
                   required
                   value={formData.flatNumber}
@@ -154,7 +154,7 @@ export default function AddVisitorModal({
             </div>
             {formData.purpose === "Other" && (
               <Input
-                placeholder="Specify purpose"
+                placeholder=""
                 className="mt-2 bg-gray-100 border-transparent focus:bg-white"
                 onChange={(e) =>
                   setFormData({ ...formData, purpose: e.target.value })
@@ -200,7 +200,6 @@ export default function AddVisitorModal({
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
-                  // @ts-ignore
                   capture="environment"
                   className="hidden"
                   onChange={handleFileChange}

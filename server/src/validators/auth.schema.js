@@ -1,34 +1,40 @@
 import { z } from "zod";
 
-// Login Schema
+// ── Auth schemas ──────────────────────────────────────
+
 export const loginSchema = z.object({
   body: z.object({
-    email: z.string().email("Invalid email format"),
+    email: z.string().email("Invalid email address"),
     password: z.string().min(6, "Password must be at least 6 characters"),
   }),
 });
 
-// Register Resident Schema
+// ── Resident registration ─────────────────────────────
+
 export const registerResidentSchema = z.object({
   body: z.object({
-    email: z.string().email("Invalid email format"),
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    name: z.string().min(2, "Name must be at least 2 characters").max(100),
-    wing: z.string().min(1, "Wing is required").max(10),
-    flatNumber: z.string().min(1, "Flat number is required").max(10),
+    name: z.string().min(2, "Name must be at least 2 characters"),
+    email: z.string().email("Invalid email address"),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .optional(),
     contact: z
       .string()
       .regex(/^\+?[\d\s-]{10,15}$/, "Invalid contact number")
       .optional(),
+    wing: z.string().min(1, "Wing is required"),
+    flatNumber: z.string().min(1, "Flat number is required"),
   }),
 });
 
-// Register Guard Schema
+// ── Guard registration ────────────────────────────────
+
 export const registerGuardSchema = z.object({
   body: z.object({
-    email: z.string().email("Invalid email format"),
+    name: z.string().min(2, "Name must be at least 2 characters"),
+    email: z.string().email("Invalid email address"),
     password: z.string().min(8, "Password must be at least 8 characters"),
-    name: z.string().min(2, "Name must be at least 2 characters").max(100),
     contact: z
       .string()
       .regex(/^\+?[\d\s-]{10,15}$/, "Invalid contact number")
@@ -36,12 +42,16 @@ export const registerGuardSchema = z.object({
   }),
 });
 
-// Change Password Schema
-export const changePasswordSchema = z.object({
+// ── Admin registration ────────────────────────────────
+
+export const registerAdminSchema = z.object({
   body: z.object({
-    currentPassword: z.string().min(1, "Current password is required"),
-    newPassword: z
+    name: z.string().min(2, "Name must be at least 2 characters"),
+    email: z.string().email("Invalid email address"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
+    contact: z
       .string()
-      .min(8, "New password must be at least 8 characters"),
+      .regex(/^\+?[\d\s-]{10,15}$/, "Invalid contact number")
+      .optional(),
   }),
 });

@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Lock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import api from "@/lib/api";
+import { AxiosError } from "axios";
 
 const ChangePassword = () => {
   const navigate = useNavigate();
@@ -48,7 +49,7 @@ const ChangePassword = () => {
     setLoading(true);
 
     try {
-      const response = await api.post("/users/change-password", {
+      const response = await api.post("/auth/change-password", {
         currentPassword: formData.currentPassword,
         newPassword: formData.newPassword,
       });
@@ -59,23 +60,18 @@ const ChangePassword = () => {
           description: "Password changed successfully",
         });
 
-        // Get user from localStorage
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        // Force user to log in again after changing password
+        localStorage.removeItem("user");
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
 
-        // Redirect to appropriate dashboard
-        const dashboardMap: Record<string, string> = {
-          ADMIN: "/dashboard/admin",
-          RESIDENT: "/dashboard/resident",
-          GUARD: "/dashboard/guard",
-        };
-
-        navigate(dashboardMap[user.role] || "/login");
+        navigate("/login");
       }
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as AxiosError<{ message: string }>;
       toast({
         title: "Error",
-        description:
-          error.response?.data?.message || "Failed to change password",
+        description: err.response?.data?.message || "Failed to change password",
         variant: "destructive",
       });
     } finally {

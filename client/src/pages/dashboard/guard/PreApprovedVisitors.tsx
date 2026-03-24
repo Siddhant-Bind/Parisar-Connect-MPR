@@ -88,7 +88,7 @@ export default function PreApprovedVisitors() {
         <div className="relative w-full sm:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
           <Input
-            placeholder="Search by name, unit, or purpose..."
+            placeholder=""
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10 h-12 bg-white shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"

@@ -19,68 +19,65 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Plus, MessageSquare, Clock } from "lucide-react";
+import { Loader2, Plus, MessageSquare, Clock, Filter } from "lucide-react";
 import { toast } from "sonner";
-import api from "@/lib/api";
-
-interface Complaint {
-  _id: string;
-  title: string;
-  description: string;
-  category: string;
-  priority: "LOW" | "MEDIUM" | "HIGH";
-  status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "REJECTED";
-  createdAt: string;
-  history: {
-    status: string;
-    remark: string;
-    updatedAt: string;
-  }[];
-}
+import { Complaint } from "@/types";
+import { useComplaints } from "@/hooks/useQueries";
+import { useCreateComplaint } from "@/hooks/useMutations";
+import { safeParseJSON } from "@/lib/utils";
 
 const ResidentComplaints = () => {
-  const [complaints, setComplaints] = useState<Complaint[]>([]);
-  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [filterCategory, setFilterCategory] = useState("ALL");
+  const [filterOwnership, setFilterOwnership] = useState("ALL");
+  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     category: "MAINTENANCE",
+    customCategory: "",
     priority: "MEDIUM",
   });
 
-  useEffect(() => {
-    fetchComplaints();
-  }, []);
+  const { data, isLoading: loading } = useComplaints(1, 100);
+  const complaints = data?.data || [];
+  const createComplaintMutation = useCreateComplaint();
 
-  const fetchComplaints = async () => {
-    try {
-      const res = await api.get("/complaints");
-      if (res.data.success) setComplaints(res.data.data);
-    } catch (error) {
-      toast.error("Failed to fetch complaints");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const filteredComplaints = complaints.filter((c) => {
+    if (filterCategory !== "ALL" && c.category !== filterCategory) return false;
+    if (filterOwnership === "MINE" && c.residentId !== user.id) return false;
+    if (filterOwnership === "OTHERS" && c.residentId === user.id) return false;
+    return true;
+  });
 
-  const handleCreate = async () => {
-    try {
-      const res = await api.post("/complaints", formData);
-      if (res.data.success) {
-        toast.success("Complaint registered successfully");
+  const handleCreate = () => {
+    if (isLocked) return;
+    setIsLocked(true);
+    const payload = {
+      title: formData.title,
+      description: formData.description,
+      category:
+        formData.category === "OTHER"
+          ? formData.customCategory || "OTHER"
+          : formData.category,
+      priority: formData.priority,
+    };
+    createComplaintMutation.mutate(payload, {
+      onSuccess: () => {
         setOpen(false);
-        fetchComplaints();
         setFormData({
           title: "",
           description: "",
           category: "MAINTENANCE",
+          customCategory: "",
           priority: "MEDIUM",
         });
-      }
-    } catch (error) {
-      toast.error("Failed to register complaint");
-    }
+      },
+      onSettled: () => {
+        setTimeout(() => setIsLocked(false), 3000);
+      },
+    });
   };
 
   return (
@@ -100,14 +97,14 @@ const ResidentComplaints = () => {
               </DialogHeader>
               <div className="space-y-4">
                 <Input
-                  placeholder="Title (e.g. Broken Tap)"
+                  placeholder="Complaint Title"
                   value={formData.title}
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
                   }
                 />
                 <Textarea
-                  placeholder="Describe the issue in detail..."
+                  placeholder="Describe your complaint in detail..."
                   value={formData.description}
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
@@ -117,7 +114,11 @@ const ResidentComplaints = () => {
                   <Select
                     value={formData.category}
                     onValueChange={(v) =>
-                      setFormData({ ...formData, category: v })
+                      setFormData({
+                        ...formData,
+                        category: v,
+                        customCategory: "",
+                      })
                     }
                   >
                     <SelectTrigger>
@@ -127,6 +128,7 @@ const ResidentComplaints = () => {
                       <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
                       <SelectItem value="SECURITY">Security</SelectItem>
                       <SelectItem value="CLEANLINESS">Cleanliness</SelectItem>
+                      <SelectItem value="GENERAL">General</SelectItem>
                       <SelectItem value="OTHER">Other</SelectItem>
                     </SelectContent>
                   </Select>
@@ -146,24 +148,79 @@ const ResidentComplaints = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                {formData.category === "OTHER" && (
+                  <Input
+                    placeholder="Enter complaint type..."
+                    value={formData.customCategory}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        customCategory: e.target.value,
+                      })
+                    }
+                  />
+                )}
                 <Button
                   onClick={handleCreate}
+                  disabled={createComplaintMutation.isPending || isLocked}
                   className="w-full bg-gradient-warm text-white"
                 >
-                  Submit Complaint
+                  {createComplaintMutation.isPending && (
+                    <Loader2 className="animate-spin w-4 h-4 mr-2" />
+                  )}
+                  {isLocked && !createComplaintMutation.isPending
+                    ? "Submitted..."
+                    : "Submit Complaint"}
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
         </div>
 
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 items-center">
+          <Filter className="w-4 h-4 text-muted-foreground" />
+          <Select
+            value={filterCategory}
+            onValueChange={setFilterCategory}
+            disabled={filterOwnership === "OTHERS"}
+          >
+            <SelectTrigger className="w-[150px] h-9">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Categories</SelectItem>
+              <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+              <SelectItem value="SECURITY">Security</SelectItem>
+              <SelectItem value="CLEANLINESS">Cleanliness</SelectItem>
+              <SelectItem value="GENERAL">General</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={filterOwnership}
+            onValueChange={(v) => {
+              setFilterOwnership(v);
+              if (v === "OTHERS") setFilterCategory("GENERAL");
+            }}
+          >
+            <SelectTrigger className="w-[160px] h-9">
+              <SelectValue placeholder="Posted by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Complaints</SelectItem>
+              <SelectItem value="MINE">My Complaints</SelectItem>
+              <SelectItem value="OTHERS">Others</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {loading ? (
           <Loader2 className="animate-spin mx-auto" />
         ) : (
           <div className="grid gap-4">
-            {complaints.map((complaint) => (
+            {filteredComplaints.map((complaint) => (
               <Card
-                key={complaint._id}
+                key={complaint.id}
                 className="shadow-soft hover:shadow-elevated transition-all"
               >
                 <CardHeader className="flex flex-row justify-between items-start pb-2">
@@ -195,7 +252,7 @@ const ResidentComplaints = () => {
                       <Clock className="w-3 h-3" />{" "}
                       {new Date(complaint.createdAt).toLocaleDateString()}
                     </span>
-                    {complaint.history.length > 0 && (
+                    {complaint.history && complaint.history.length > 0 && (
                       <span className="italic">
                         Last update:{" "}
                         {complaint.history[
@@ -208,9 +265,9 @@ const ResidentComplaints = () => {
                 </CardContent>
               </Card>
             ))}
-            {complaints.length === 0 && (
+            {filteredComplaints.length === 0 && (
               <p className="text-center text-muted-foreground">
-                No complaints history.
+                No complaints found.
               </p>
             )}
           </div>

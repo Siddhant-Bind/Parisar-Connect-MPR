@@ -16,9 +16,28 @@ const createNotice = asyncHandler(async (req, res) => {
       content,
       type: type || "INFO",
       priority: priority || "LOW",
-      // createdBy: req.user.id // If we add relation later
+      societyId: req.user.societyId,
     },
   });
+
+  // Notify all residents
+  const residents = await prisma.user.findMany({
+    where: { societyId: req.user.societyId, role: "RESIDENT", deletedAt: null },
+    select: { id: true },
+  });
+
+  if (residents.length > 0) {
+    await prisma.notification.createMany({
+      data: residents.map((r) => ({
+        title: `New Notice: ${title}`,
+        message:
+          content.substring(0, 100) + (content.length > 100 ? "..." : ""),
+        type: "NOTICE",
+        userId: r.id,
+        societyId: req.user.societyId,
+      })),
+    });
+  }
 
   return res
     .status(201)
@@ -26,43 +45,92 @@ const createNotice = asyncHandler(async (req, res) => {
 });
 
 const getAllNotices = asyncHandler(async (req, res) => {
-  const notices = await prisma.notice.findMany({
-    orderBy: { createdAt: "desc" },
-  });
+  const page = parseInt(req.query.page) || 1;
+  const limit = Math.max(1, parseInt(req.query.limit) || 10);
+  const skip = (page - 1) * limit;
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, notices, "Notices fetched successfully"));
+  const [notices, total] = await Promise.all([
+    prisma.notice.findMany({
+      where: { societyId: req.user.societyId, deletedAt: null },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    }),
+    prisma.notice.count({
+      where: { societyId: req.user.societyId, deletedAt: null },
+    }),
+  ]);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        data: notices,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      },
+      "Notices fetched successfully",
+    ),
+  );
 });
 
+// GET /notices/:id
+const getNoticeById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const notice = await prisma.notice.findUnique({ where: { id } });
+  if (!notice || notice.deletedAt) throw new ApiError(404, "Notice not found");
+  if (notice.societyId !== req.user.societyId)
+    throw new ApiError(403, "Access denied");
+
+  return res.status(200).json(new ApiResponse(200, notice, "Notice fetched"));
+});
+
+// PATCH or PUT /notices/:id  (Admin only — enforced at route level)
 const updateNotice = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { title, content, type, priority } = req.body;
 
-  try {
-    const notice = await prisma.notice.update({
-      where: { id },
-      data: { title, content, type, priority },
-    });
-    return res
-      .status(200)
-      .json(new ApiResponse(200, notice, "Notice updated successfully"));
-  } catch (error) {
-    throw new ApiError(404, "Notice not found");
-  }
+  const existing = await prisma.notice.findUnique({ where: { id } });
+  if (!existing || existing.deletedAt) throw new ApiError(404, "Notice not found");
+  if (existing.societyId !== req.user.societyId)
+    throw new ApiError(403, "Access denied");
+
+  const notice = await prisma.notice.update({
+    where: { id },
+    data: { title, content, type, priority },
+  });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, notice, "Notice updated successfully"));
 });
 
+// DELETE /notices/:id  (Admin only — enforced at route level)
 const deleteNotice = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  try {
-    await prisma.notice.delete({ where: { id } });
-    return res
-      .status(200)
-      .json(new ApiResponse(200, {}, "Notice deleted successfully"));
-  } catch (error) {
-    throw new ApiError(404, "Notice not found");
-  }
+  const existing = await prisma.notice.findUnique({ where: { id } });
+  if (!existing || existing.deletedAt) throw new ApiError(404, "Notice not found");
+  if (existing.societyId !== req.user.societyId)
+    throw new ApiError(403, "Access denied");
+
+  await prisma.notice.update({
+    where: { id },
+    data: { deletedAt: new Date() },
+  });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Notice deleted successfully"));
 });
 
-export { createNotice, getAllNotices, deleteNotice, updateNotice };
+export {
+  createNotice,
+  getAllNotices,
+  getNoticeById,
+  deleteNotice,
+  updateNotice,
+};

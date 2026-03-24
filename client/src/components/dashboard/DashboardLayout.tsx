@@ -18,6 +18,9 @@ import {
   Check,
 } from "lucide-react";
 import { ModeToggle } from "@/components/mode-toggle";
+import logo from "@/assets/logo.png";
+import api from "@/lib/api";
+import { NotificationBell } from "./NotificationBell";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -53,8 +56,10 @@ const roleConfig = {
     title: "Admin",
     navItems: [
       { label: "Dashboard", icon: Home, path: "/dashboard/admin" },
+      { label: "Reports", icon: Building2, path: "/dashboard/admin/reports" },
       { label: "Residents", icon: Users, path: "/dashboard/admin/residents" },
       { label: "Guards", icon: Shield, path: "/dashboard/admin/guards" },
+      { label: "Approvals", icon: Shield, path: "/dashboard/admin/approvals" },
       {
         label: "Notices", // Changed from Announcements to match page title usually
         icon: Bell,
@@ -116,8 +121,12 @@ const DashboardLayout = ({
       {/* Logo */}
       <div className="p-6 border-b border-border">
         <Link to="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-warm flex items-center justify-center shadow-button">
-            <span className="text-primary-foreground font-bold text-lg">P</span>
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center">
+            <img
+              src={logo}
+              alt="Parisar Connect"
+              className="w-full h-full object-contain"
+            />
           </div>
           <div>
             <p className="font-bold text-foreground">Parisar Connect</p>
@@ -170,48 +179,24 @@ const DashboardLayout = ({
         })}
       </nav>
 
-      {/* Switch Role (Demo) */}
+      {/* Footer */}
       <div className="p-4 border-t border-border">
-        <div className="flex items-center justify-between mb-2 px-2">
-          <p className="text-xs text-muted-foreground">
-            Switch Dashboard (Demo)
-          </p>
+        <div className="flex items-center justify-between mb-3 px-2">
+          <p className="text-xs text-muted-foreground">Appearance</p>
           <ModeToggle />
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          <Button
-            variant={role === "resident" ? "default" : "outline"}
-            size="sm"
-            className="rounded-lg text-xs"
-            onClick={() => navigate("/dashboard/resident")}
-          >
-            Resident
-          </Button>
-          <Button
-            variant={role === "admin" ? "default" : "outline"}
-            size="sm"
-            className="rounded-lg text-xs"
-            onClick={() => navigate("/dashboard/admin")}
-          >
-            Admin
-          </Button>
-          <Button
-            variant={role === "guard" ? "default" : "outline"}
-            size="sm"
-            className="rounded-lg text-xs"
-            onClick={() => navigate("/dashboard/guard")}
-          >
-            Guard
-          </Button>
-        </div>
-      </div>
-
-      {/* Logout */}
-      <div className="p-4 border-t border-border">
         <Button
           variant="ghost"
           className="w-full justify-start text-muted-foreground hover:text-destructive rounded-xl"
-          onClick={() => navigate("/login")}
+          onClick={async () => {
+            try {
+              await api.post("/auth/logout");
+            } catch {
+              // Ignore logout API errors
+            }
+            localStorage.removeItem("user");
+            navigate("/login");
+          }}
         >
           <LogOut className="w-5 h-5 mr-3" />
           Logout
@@ -231,27 +216,37 @@ const DashboardLayout = ({
       <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-sm border-b border-border">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-warm flex items-center justify-center">
-              <span className="text-primary-foreground font-bold">P</span>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center">
+              <img
+                src={logo}
+                alt="Parisar Connect"
+                className="w-full h-full object-contain"
+              />
             </div>
             <span className="font-bold text-foreground">Parisar Connect</span>
           </div>
-          <Sheet open={isOpen} onOpenChange={setIsOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-xl">
-                <Menu className="w-5 h-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-72 p-0 bg-card">
-              <NavContent />
-            </SheetContent>
-          </Sheet>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-xl">
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72 p-0 bg-card">
+                <NavContent />
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="lg:pl-64 pt-16 lg:pt-0 min-h-screen">
-        <div className="p-4 lg:p-8">{children}</div>
+        <div className="hidden lg:flex items-center justify-end p-4 lg:px-8 pb-0">
+          <NotificationBell />
+        </div>
+        <div className="p-4 lg:p-8 lg:pt-4">{children}</div>
       </main>
 
       {/* Mobile Bottom Navigation */}

@@ -89,7 +89,7 @@ export default function GuardVisitors() {
       <div className="flex items-center gap-2 max-w-sm">
         <Search className="h-4 w-4 text-gray-500" />
         <Input
-          placeholder="Search name, flat..."
+          placeholder=""
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />

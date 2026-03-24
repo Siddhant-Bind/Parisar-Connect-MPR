@@ -28,9 +28,7 @@ import api from "@/lib/api";
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Invalid email address." }),
-  password: z
-    .string()
-    .min(6, { message: "Password must be at least 6 characters." }),
+  password: z.string().optional(),
   contact: z
     .string()
     .min(10, { message: "Contact number must be at least 10 digits." }),
@@ -65,7 +63,7 @@ export function AddResidentModal({
     setGeneratedPassword(null);
     setIsLoading(true);
     try {
-      const response = await api.post("/admin/residents", values);
+      const response = await api.post("/residents", values);
       if (response.status !== 201) {
         throw new Error(response.data.message || "Failed to add resident"); // Axios throws on error usually, but status check here
       }
@@ -75,9 +73,16 @@ export function AddResidentModal({
         description: "Resident added successfully",
       });
 
-      form.reset();
-      setOpen(false);
-      onResidentAdded?.();
+      if (response.data.data?.tempPassword) {
+        setGeneratedPassword(response.data.data.tempPassword);
+        // Don't close modal immediately so they can see the password
+        form.reset();
+        onResidentAdded?.();
+      } else {
+        form.reset();
+        setOpen(false);
+        onResidentAdded?.();
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -115,7 +120,7 @@ export function AddResidentModal({
                 <FormItem>
                   <FormLabel>Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="John Doe" {...field} />
+                    <Input placeholder="Enter resident's name" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -128,7 +133,7 @@ export function AddResidentModal({
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="john@example.com" {...field} />
+                    <Input placeholder="Enter resident's email" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -139,9 +144,14 @@ export function AddResidentModal({
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>
+                    Password{" "}
+                    <span className="text-xs text-muted-foreground font-normal">
+                      (Leave empty to auto-generate)
+                    </span>
+                  </FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="******" {...field} />
+                    <Input type="password" placeholder="" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -155,7 +165,7 @@ export function AddResidentModal({
                   <FormItem>
                     <FormLabel>Contact</FormLabel>
                     <FormControl>
-                      <Input placeholder="9876543210" {...field} />
+                      <Input placeholder="+91" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -169,7 +179,7 @@ export function AddResidentModal({
                     <FormItem>
                       <FormLabel>Wing</FormLabel>
                       <FormControl>
-                        <Input placeholder="A" {...field} />
+                        <Input placeholder="" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -182,7 +192,7 @@ export function AddResidentModal({
                     <FormItem>
                       <FormLabel>Flat</FormLabel>
                       <FormControl>
-                        <Input placeholder="101" {...field} />
+                        <Input placeholder="" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -199,6 +209,32 @@ export function AddResidentModal({
             </DialogFooter>
           </form>
         </Form>
+
+        {generatedPassword && (
+          <div className="mt-4 p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
+            <h4 className="text-sm font-semibold text-green-700 dark:text-green-400 mb-1">
+              Resident Created Successfully!
+            </h4>
+            <p className="text-sm text-muted-foreground mb-3">
+              Share this temporary password with the resident:
+            </p>
+            <div className="flex items-center justify-center gap-2">
+              <code className="px-3 py-1.5 rounded bg-background border font-mono text-lg select-all">
+                {generatedPassword}
+              </code>
+            </div>
+            <Button
+              variant="outline"
+              className="mt-3 w-full"
+              onClick={() => {
+                setOpen(false);
+                setGeneratedPassword(null);
+              }}
+            >
+              Close
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -15,8 +15,10 @@ import {
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import api from "@/lib/api";
 import { Loader2 } from "lucide-react";
+import { Notice, Visitor } from "@/types";
+import { useNotices, useVisitors, usePayments } from "@/hooks/useQueries";
+import { safeParseJSON } from "@/lib/utils";
 
 const ResidentDashboard = () => {
   const [stats, setStats] = useState({
@@ -25,62 +27,48 @@ const ResidentDashboard = () => {
     dueAmount: 0,
     eventsCount: 0,
   });
-  const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [visitors, setVisitors] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const [announcements, setAnnouncements] = useState<Notice[]>([]);
+  const [visitors, setVisitors] = useState<Visitor[]>([]);
+  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
   const navigate = useNavigate();
 
+  const { data: noticesResp, isLoading: load1 } = useNotices(1, 10);
+  const { data: visitorsResp, isLoading: load2 } = useVisitors(1, 10);
+  const { data: paymentsResp, isLoading: load3 } = usePayments(1, 100);
+
+  const loading = load1 || load2 || load3;
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [noticesRes, visitorsRes, paymentsRes] = await Promise.all([
-          api.get("/notices"),
-          api.get("/visitors"),
-          api.get("/payments"),
-        ]);
+    if (loading) return;
 
-        if (noticesRes.data.success) {
-          const allNotices = noticesRes.data.data;
-          setStats((prev) => ({ ...prev, noticesCount: allNotices.length }));
-          setAnnouncements(allNotices.slice(0, 3)); // Top 3
-        }
+    if (noticesResp?.data) {
+      setStats((prev) => ({ ...prev, noticesCount: noticesResp.data.length }));
+      setAnnouncements(noticesResp.data.slice(0, 3));
+    }
 
-        if (visitorsRes.data.success) {
-          const allVisitors = visitorsRes.data.data;
-          // Filter for today (though backend doesn't filter by date, let's do simple check or just count all for now as "Recent")
-          // actually dashboard stats usually implies "active" or "today".
-          // Let's just use total count for now or filter client side if date string matches today.
-          const today = new Date().toDateString();
-          const todayVisitors = allVisitors.filter(
-            (v: any) => new Date(v.entryTime).toDateString() === today,
-          );
-          setStats((prev) => ({
-            ...prev,
-            visitorsToday: todayVisitors.length,
-          }));
-          setVisitors(allVisitors.slice(0, 3));
-        }
+    if (visitorsResp?.data) {
+      const today = new Date().toDateString();
+      const todayVisitors = visitorsResp.data.filter(
+        (v: any) => new Date(v.entryTime).toDateString() === today,
+      );
+      setStats((prev) => ({
+        ...prev,
+        visitorsToday: todayVisitors.length,
+      }));
+      setVisitors(visitorsResp.data.slice(0, 3));
+    }
 
-        if (paymentsRes.data.success) {
-          const allPayments = paymentsRes.data.data;
-          const pending = allPayments.filter(
-            (p: any) => p.status === "PENDING",
-          );
-          const totalDue = pending.reduce(
-            (sum: number, p: any) => sum + p.amount,
-            0,
-          );
-          setStats((prev) => ({ ...prev, dueAmount: totalDue }));
-        }
-      } catch (error) {
-        console.error("Failed to fetch dashboard data", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+    if (paymentsResp?.data) {
+      const pending = paymentsResp.data.filter(
+        (p: any) => p.status === "PENDING",
+      );
+      const totalDue = pending.reduce(
+        (sum: number, p: any) => sum + p.amount,
+        0,
+      );
+      setStats((prev) => ({ ...prev, dueAmount: totalDue }));
+    }
+  }, [loading, noticesResp, visitorsResp, paymentsResp]);
 
   if (loading) {
     return (
@@ -99,7 +87,8 @@ const ResidentDashboard = () => {
             Welcome back, {user.name?.split(" ")[0]} 👋
           </h1>
           <p className="text-muted-foreground">
-            Here's what's happening in Sunshine Residency today.
+            Here's what's happening in {user.society?.name || "your society"}{" "}
+            today.
           </p>
         </div>
 
@@ -162,7 +151,9 @@ const ResidentDashboard = () => {
                   <Calendar className="w-5 h-5 text-deep-navy" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-foreground">0</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {stats.eventsCount}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     Upcoming Events
                   </p>
@@ -195,7 +186,7 @@ const ResidentDashboard = () => {
             <CardContent className="space-y-3">
               {announcements.map((item) => (
                 <div
-                  key={item._id}
+                  key={item.id}
                   className="flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
@@ -251,7 +242,7 @@ const ResidentDashboard = () => {
             <CardContent className="space-y-3">
               {visitors.map((visitor) => (
                 <div
-                  key={visitor._id}
+                  key={visitor.id}
                   className="flex items-center justify-between p-3 rounded-xl bg-muted/50"
                 >
                   <div className="flex items-center gap-3">

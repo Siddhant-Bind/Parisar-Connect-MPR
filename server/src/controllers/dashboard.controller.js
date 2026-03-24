@@ -1,14 +1,19 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import prisma from "../db/prisma.js";
 
 const getDashboardStats = asyncHandler(async (req, res) => {
+  const sid = req.user.societyId;
+  if (!sid) {
+    throw new ApiError(400, "User is not associated with any society");
+  }
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  // Parallel execution for performance
+  // Parallel execution for performance — all scoped to society
   const [
     totalResidents,
     openComplaints,
@@ -17,25 +22,39 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     currentVisitors,
     pendingApprovals,
   ] = await Promise.all([
-    prisma.user.count({ where: { role: "RESIDENT" } }),
-    prisma.complaint.count({ where: { status: "OPEN" } }),
-    prisma.payment.count({ where: { status: "PENDING" } }),
+    prisma.user.count({
+      where: { role: "RESIDENT", societyId: sid, deletedAt: null },
+    }),
+    prisma.complaint.count({
+      where: { status: "OPEN", societyId: sid, deletedAt: null },
+    }),
+    prisma.payment.count({
+      where: { status: "PENDING", societyId: sid, deletedAt: null },
+    }),
     prisma.visitor.count({
       where: {
+        societyId: sid,
+        deletedAt: null,
         entryTime: {
           gte: today,
           lt: tomorrow,
         },
       },
     }),
-    prisma.visitor.count({ where: { status: "ENTERED" } }),
-    prisma.visitor.count({ where: { status: "APPROVED" } }),
+    prisma.visitor.count({
+      where: { status: "ENTERED", societyId: sid, deletedAt: null },
+    }),
+    prisma.visitor.count({
+      where: { status: "APPROVED", societyId: sid, deletedAt: null },
+    }),
   ]);
 
-  // Calculate collection rate (mock logic for now or simple ratio)
-  const totalPayments = await prisma.payment.count();
+  // Calculate collection rate
+  const totalPayments = await prisma.payment.count({
+    where: { societyId: sid, deletedAt: null },
+  });
   const paidPayments = await prisma.payment.count({
-    where: { status: "PAID" },
+    where: { status: "PAID", societyId: sid, deletedAt: null },
   });
   const collectionRate =
     totalPayments > 0 ? Math.round((paidPayments / totalPayments) * 100) : 0;

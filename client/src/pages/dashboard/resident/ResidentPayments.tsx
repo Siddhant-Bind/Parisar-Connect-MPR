@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 
 interface Payment {
-  _id: string;
+  id: string;
   type: string;
   month: string;
   amount: number;
@@ -74,7 +74,7 @@ const ResidentPayments = () => {
                 </TableHeader>
                 <TableBody>
                   {payments.map((payment) => (
-                    <TableRow key={payment._id}>
+                    <TableRow key={payment.id}>
                       <TableCell>{payment.type}</TableCell>
                       <TableCell>{payment.month}</TableCell>
                       <TableCell className="font-bold">
@@ -99,7 +99,7 @@ const ResidentPayments = () => {
                           <Button
                             size="sm"
                             className="bg-gradient-warm text-white shadow-button"
-                            onClick={() => handlePay(payment._id)}
+                            onClick={() => handlePay(payment.id)}
                           >
                             <CreditCard className="w-4 h-4 mr-2" /> Pay Now
                           </Button>

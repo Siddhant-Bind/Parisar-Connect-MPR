@@ -4,11 +4,18 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import ForgotPassword from "./pages/ForgotPassword";
+import ChangePassword from "./pages/ChangePassword";
+import CreateSociety from "./pages/CreateSociety";
+import JoinSociety from "./pages/JoinSociety";
 import ResidentDashboard from "./pages/dashboard/ResidentDashboard";
 import AdminDashboard from "./pages/dashboard/AdminDashboard";
+import AdminApprovals from "./pages/dashboard/AdminApprovals";
+import Reports from "./pages/dashboard/Reports";
 import GuardDashboard from "./pages/dashboard/guard/GuardDashboard";
 import GuardVisitors from "./pages/dashboard/guard/GuardVisitors";
 import AddVisitorPage from "./pages/dashboard/guard/AddVisitorPage";
@@ -41,55 +48,198 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* Public Routes */}
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-            <Route path="/dashboard/resident" element={<ResidentDashboard />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/change-password" element={<ChangePassword />} />
+
+            {/* Protected: Society Setup (Admin only) */}
+            <Route
+              path="/create-society"
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <CreateSociety />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/join-society"
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <JoinSociety />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Protected: Resident Dashboard */}
+            <Route
+              path="/dashboard/resident"
+              element={
+                <ProtectedRoute allowedRoles={["RESIDENT"]}>
+                  <ResidentDashboard />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/dashboard/resident/payments"
-              element={<ResidentPayments />}
+              element={
+                <ProtectedRoute allowedRoles={["RESIDENT"]}>
+                  <ResidentPayments />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/dashboard/resident/notices"
-              element={<ResidentNotices />}
+              element={
+                <ProtectedRoute allowedRoles={["RESIDENT"]}>
+                  <ResidentNotices />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/dashboard/resident/complaints"
-              element={<ResidentComplaints />}
+              element={
+                <ProtectedRoute allowedRoles={["RESIDENT"]}>
+                  <ResidentComplaints />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/dashboard/resident/visitors"
-              element={<ResidentVisitors />}
+              element={
+                <ProtectedRoute allowedRoles={["RESIDENT"]}>
+                  <ResidentVisitors />
+                </ProtectedRoute>
+              }
             />
-            <Route path="/dashboard/admin" element={<AdminDashboard />} />
-            <Route path="/dashboard/admin/residents" element={<Residents />} />
-            <Route path="/dashboard/admin/guards" element={<Guards />} />
-            <Route path="/dashboard/admin/notices" element={<Notices />} />
+
+            {/* Protected: Admin Dashboard */}
+            <Route
+              path="/dashboard/admin"
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/admin/residents"
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <Residents />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/admin/approvals"
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <AdminApprovals />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/admin/reports"
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <Reports />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/admin/guards"
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <Guards />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/admin/notices"
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <Notices />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/dashboard/admin/complaints"
-              element={<Complaints />}
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <Complaints />
+                </ProtectedRoute>
+              }
             />
-            <Route path="/dashboard/admin/visitors" element={<Visitors />} />
-            <Route path="/dashboard/admin/payments" element={<Payments />} />
-            <Route path="/dashboard/guard" element={<GuardDashboard />} />
+            <Route
+              path="/dashboard/admin/visitors"
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <Visitors />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/admin/payments"
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <Payments />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Protected: Guard Dashboard */}
+            <Route
+              path="/dashboard/guard"
+              element={
+                <ProtectedRoute allowedRoles={["GUARD"]}>
+                  <GuardDashboard />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/dashboard/guard/visitors"
-              element={<GuardVisitors />}
+              element={
+                <ProtectedRoute allowedRoles={["GUARD"]}>
+                  <GuardVisitors />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/dashboard/guard/add-visitor"
-              element={<AddVisitorPage />}
+              element={
+                <ProtectedRoute allowedRoles={["GUARD"]}>
+                  <AddVisitorPage />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/dashboard/guard/pre-approved"
-              element={<PreApprovedVisitors />}
+              element={
+                <ProtectedRoute allowedRoles={["GUARD"]}>
+                  <PreApprovedVisitors />
+                </ProtectedRoute>
+              }
             />
-            <Route path="/dashboard/guard/todays-log" element={<TodaysLog />} />
+            <Route
+              path="/dashboard/guard/todays-log"
+              element={
+                <ProtectedRoute allowedRoles={["GUARD"]}>
+                  <TodaysLog />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/dashboard/guard/history"
-              element={<VisitorHistory />}
+              element={
+                <ProtectedRoute allowedRoles={["GUARD"]}>
+                  <VisitorHistory />
+                </ProtectedRoute>
+              }
             />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+
+            {/* Catch-all */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

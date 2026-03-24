@@ -71,6 +71,7 @@ model Society {
   complaints Complaint[]
   payments   Payment[]
   visitors   Visitor[]
+  notifications Notification[]
 
   @@index([creatorId])
   @@index([deletedAt])
@@ -85,8 +86,8 @@ model User {
   password       String? // Supabase handles auth, this is optional
   
   // Society relation
-  societyId      String
-  society        Society  @relation(fields: [societyId], references: [id])
+  societyId      String?
+  society        Society?  @relation(fields: [societyId], references: [id])
   
   // Resident-specific fields
   wing           String?
@@ -107,6 +108,7 @@ model User {
   complaints     Complaint[]
   payments       Payment[]
   visitorLogs    Visitor[] @relation("EnteredBy")
+  notifications  Notification[]
 
   @@index([societyId, role])
   @@index([email])
@@ -228,4 +230,24 @@ model Visitor {
   @@index([isWalkIn])
   @@index([deletedAt])
   @@map("visitors")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  type      String   // "NOTICE", "COMPLAINT", "PAYMENT", "VISITOR"
+  isRead    Boolean  @default(false)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  societyId String
+  society   Society  @relation(fields: [societyId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([societyId])
+  @@map("notifications")
 }

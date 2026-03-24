@@ -9,35 +9,11 @@ import {
 } from "@/components/ui/card";
 import { Loader2, Megaphone } from "lucide-react";
 import { toast } from "sonner";
-import api from "@/lib/api";
-
-interface Notice {
-  _id: string;
-  title: string;
-  content: string;
-  type: "INFO" | "EVENT" | "ALERT";
-  priority: "LOW" | "MEDIUM" | "HIGH";
-  createdAt: string;
-}
-
+import { Notice } from "@/types";
+import { useNotices } from "@/hooks/useQueries";
 const ResidentNotices = () => {
-  const [notices, setNotices] = useState<Notice[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchNotices();
-  }, []);
-
-  const fetchNotices = async () => {
-    try {
-      const res = await api.get("/notices");
-      if (res.data.success) setNotices(res.data.data);
-    } catch (error) {
-      toast.error("Failed to fetch notices");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data, isLoading: loading } = useNotices(1, 100);
+  const notices = data?.data || [];
 
   return (
     <DashboardLayout role="resident">
@@ -50,7 +26,7 @@ const ResidentNotices = () => {
           <div className="grid gap-4">
             {notices.map((notice) => (
               <Card
-                key={notice._id}
+                key={notice.id}
                 className="shadow-soft hover:shadow-elevated transition-all border-l-4"
                 style={{
                   borderLeftColor:

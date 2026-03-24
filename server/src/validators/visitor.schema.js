@@ -2,6 +2,9 @@ import { z } from "zod";
 import { VISITOR_STATUS } from "../constants.js";
 
 // Create Visitor Schema
+// Note: Some fields (contact, vehicleNumber, documentImage) accept empty strings
+// because guards may log walk-ins without these details, and residents pre-approve
+// visitors with minimal info. Stricter validation would break these flows.
 export const createVisitorSchema = z.object({
   body: z.object({
     name: z.string().min(2, "Name must be at least 2 characters").max(100),
@@ -11,13 +14,10 @@ export const createVisitorSchema = z.object({
       .max(500),
     wing: z.string().min(1, "Wing is required").max(10),
     flatNumber: z.string().min(1, "Flat number is required").max(10),
-    contact: z
-      .string()
-      .regex(/^\+?[\d\s-]{10,15}$/, "Invalid contact number")
-      .optional(),
-    visitorType: z.enum(["Guest", "Delivery", "Staff"]).default("Guest"),
-    vehicleNumber: z.string().max(20).optional(),
-    documentImage: z.string().optional(), // Base64 or URL
+    contact: z.string().optional().or(z.literal("")), // allow empty strings
+    visitorType: z.string().optional(), // allow string from form, or optional
+    vehicleNumber: z.string().max(20).optional().or(z.literal("")),
+    documentImage: z.string().optional().or(z.literal("")).nullable(),
   }),
 });
 

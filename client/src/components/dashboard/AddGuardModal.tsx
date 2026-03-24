@@ -30,7 +30,7 @@ const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
   password: z
     .string()
-    .min(6, { message: "Password must be at least 6 characters." }),
+    .min(8, { message: "Password must be at least 8 characters." }),
   contact: z
     .string()
     .min(10, { message: "Contact number must be at least 10 digits." }),
@@ -53,7 +53,7 @@ export function AddGuardModal({ onGuardAdded }: { onGuardAdded?: () => void }) {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      const response = await api.post("/admin/guards", values);
+      const response = await api.post("/admins", values); // Guard registration endpoint
 
       if (response.status !== 201) {
         throw new Error(response.data.message || "Failed to add guard");
@@ -104,7 +104,7 @@ export function AddGuardModal({ onGuardAdded }: { onGuardAdded?: () => void }) {
                 <FormItem>
                   <FormLabel>Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Guard Name" {...field} />
+                    <Input placeholder="Enter your name" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -117,7 +117,7 @@ export function AddGuardModal({ onGuardAdded }: { onGuardAdded?: () => void }) {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="guard@example.com" {...field} />
+                    <Input placeholder="Enter guard's email" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -130,7 +130,7 @@ export function AddGuardModal({ onGuardAdded }: { onGuardAdded?: () => void }) {
                 <FormItem>
                   <FormLabel>Password</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="******" {...field} />
+                    <Input type="password" placeholder="" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -143,7 +143,7 @@ export function AddGuardModal({ onGuardAdded }: { onGuardAdded?: () => void }) {
                 <FormItem>
                   <FormLabel>Contact</FormLabel>
                   <FormControl>
-                    <Input placeholder="9876543210" {...field} />
+                    <Input placeholder="+91" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

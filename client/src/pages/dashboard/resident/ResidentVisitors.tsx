@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
-import api from "@/lib/api";
 import {
   Table,
   TableBody,
@@ -23,65 +22,39 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-
-interface Visitor {
-  _id: string; // Keep as _id if that's what backend returns, but schema says id. Checking interface usage.
-  id: string; // Add id to be safe
-  name: string;
-  purpose: string;
-  wing: string;
-  flatNumber: string;
-  entryTime: string;
-  exitTime?: string;
-  status: "PENDING" | "APPROVED" | "ENTERED" | "EXITED";
-}
+import { Visitor } from "@/types";
+import { useVisitors } from "@/hooks/useQueries";
+import { useCreateVisitor } from "@/hooks/useMutations";
+import { safeParseJSON } from "@/lib/utils";
 
 const ResidentVisitors = () => {
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    purpose: "",
+    purpose: "Guest",
   });
-  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchVisitors();
-  }, []);
+  const { data, isLoading: loading } = useVisitors(1, 100);
+  const visitors = data?.data || [];
+  const createVisitorMutation = useCreateVisitor();
 
-  const fetchVisitors = async () => {
-    try {
-      const res = await api.get("/visitors");
-      if (res.data.success) setVisitors(res.data.data);
-    } catch (error) {
-      toast.error("Failed to fetch visitor logs");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePreApprove = async (e: React.FormEvent) => {
+  const handlePreApprove = (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
-    try {
-      // Backend automatically sets status=APPROVED and gets wing/flat from user token
-      await api.post("/visitors", {
+    const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
+    createVisitorMutation.mutate(
+      {
         name: formData.name,
         purpose: formData.purpose,
-        // wing/flatNumber are inferred from resident's profile in backend
-        wing: "A", // Fallback if backend needs it, but controller should handle or we need to fetch profile.
-        flatNumber: "101", // Placeholder, ideally fetched from profile context
-      });
-      toast.success("Visitor pre-approved successfully");
-      setIsModalOpen(false);
-      setFormData({ name: "", purpose: "" });
-      fetchVisitors();
-    } catch (error) {
-      toast.error("Failed to pre-approve visitor");
-    } finally {
-      setSubmitting(false);
-    }
+        wing: user?.wing || "A",
+        flatNumber: user?.flatNumber || "101",
+      },
+      {
+        onSuccess: () => {
+          setIsModalOpen(false);
+          setFormData({ name: "", purpose: "" });
+        },
+      },
+    );
   };
 
   return (
@@ -113,7 +86,7 @@ const ResidentVisitors = () => {
                 </TableHeader>
                 <TableBody>
                   {visitors.map((visitor) => (
-                    <TableRow key={visitor.id || visitor._id}>
+                    <TableRow key={visitor.id || visitor.id}>
                       <TableCell className="font-medium">
                         {visitor.name}
                       </TableCell>
@@ -169,7 +142,7 @@ const ResidentVisitors = () => {
                 <Label htmlFor="name">Visitor Name</Label>
                 <Input
                   id="name"
-                  placeholder="John Doe"
+                  placeholder="Enter your name"
                   value={formData.name}
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
@@ -201,8 +174,13 @@ const ResidentVisitors = () => {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? "Approving..." : "Pre-approve"}
+                <Button
+                  type="submit"
+                  disabled={createVisitorMutation.isPending}
+                >
+                  {createVisitorMutation.isPending
+                    ? "Approving..."
+                    : "Pre-approve"}
                 </Button>
               </DialogFooter>
             </form>

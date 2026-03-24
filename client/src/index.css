@@ -222,6 +222,19 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-family: "Nunito", sans-serif;
   }
+
+  /* Global lighter grey placeholder styling */
+  input::placeholder,
+  textarea::placeholder {
+    color: hsl(0 0% 65%);
+    opacity: 1;
+  }
+
+  .dark input::placeholder,
+  .dark textarea::placeholder {
+    color: hsl(0 0% 45%);
+    opacity: 1;
+  }
 }
 
 @layer components {

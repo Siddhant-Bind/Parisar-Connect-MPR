@@ -17,9 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Bell, Plus, Trash2, Loader2, Megaphone } from "lucide-react";
+import { Search, Bell, Plus, Trash2, Loader2, Megaphone } from "lucide-react";
 import { toast } from "sonner";
-import api from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -28,18 +27,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-interface Notice {
-  _id: string;
-  title: string;
-  content: string;
-  type: "INFO" | "EVENT" | "ALERT";
-  priority: "LOW" | "MEDIUM" | "HIGH";
-  createdAt: string;
-}
+import { Notice } from "@/types";
+import { useNotices } from "@/hooks/useQueries";
+import { useCreateNotice, useDeleteNotice } from "@/hooks/useMutations";
+import { safeParseJSON } from "@/lib/utils";
 
 const Notices = () => {
-  const [notices, setNotices] = useState<Notice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const limit = 10;
+
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
@@ -48,131 +45,130 @@ const Notices = () => {
     priority: "MEDIUM",
   });
 
-  useEffect(() => {
-    fetchNotices();
-  }, []);
+  const { data, isLoading: loading } = useNotices(page, limit);
+  const notices = data?.data || [];
+  const totalPages = data?.totalPages || 1;
 
-  const fetchNotices = async () => {
-    try {
-      // Keep public read for list, or use admin route if this is admin page (it is)
-      const res = await api.get("/notices");
-      if (res.data.success) setNotices(res.data.data);
-    } catch (error) {
-      toast.error("Failed to fetch notices");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const createNoticeMutation = useCreateNotice();
+  const deleteNoticeMutation = useDeleteNotice();
 
-  const handleCreate = async () => {
-    try {
-      const res = await api.post("/admin/notices", formData);
-      if (res.data.success) {
-        toast.success("Notice created");
+  const handleCreate = () => {
+    createNoticeMutation.mutate(formData, {
+      onSuccess: () => {
         setOpen(false);
-        fetchNotices();
         setFormData({
           title: "",
           content: "",
           type: "INFO",
           priority: "MEDIUM",
         });
-      } else {
-        toast.error(data.message);
-      }
-    } catch (error) {
-      toast.error("Failed to create notice");
-    }
+      },
+    });
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      await api.delete(`/admin/notices/${id}`);
-      toast.success("Notice deleted");
-      setNotices(notices.filter((n) => n._id !== id));
-    } catch (error) {
-      toast.error("Failed to delete notice");
-    }
+  const handleDelete = (id: string) => {
+    deleteNoticeMutation.mutate(id);
   };
+
+  const filteredNotices = notices.filter(
+    (n) =>
+      n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      n.content.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
+  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
 
   return (
-    <DashboardLayout role="admin">
+    <DashboardLayout role="admin" userName={user.name || "Admin"}>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-3xl font-bold">Notices & Announcements</h1>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="rounded-xl shadow-button btn-press bg-gradient-warm text-white">
-                <Plus className="w-4 h-4 mr-2" /> Create Notice
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Notice</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <Input
-                  placeholder="Title"
-                  value={formData.title}
-                  onChange={(e) =>
-                    setFormData({ ...formData, title: e.target.value })
-                  }
-                />
-                <Textarea
-                  placeholder="Content"
-                  value={formData.content}
-                  onChange={(e) =>
-                    setFormData({ ...formData, content: e.target.value })
-                  }
-                />
-                <div className="flex gap-4">
-                  <Select
-                    value={formData.type}
-                    onValueChange={(v) => setFormData({ ...formData, type: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="INFO">Info</SelectItem>
-                      <SelectItem value="EVENT">Event</SelectItem>
-                      <SelectItem value="ALERT">Alert</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={formData.priority}
-                    onValueChange={(v) =>
-                      setFormData({ ...formData, priority: v })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="LOW">Low</SelectItem>
-                      <SelectItem value="MEDIUM">Medium</SelectItem>
-                      <SelectItem value="HIGH">High</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  onClick={handleCreate}
-                  className="w-full bg-gradient-warm text-white"
-                >
-                  Post Notice
+          <div className="flex items-center gap-4">
+            <div className="relative w-full sm:w-64 max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search notices..."
+                className="pl-8"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button className="rounded-xl shadow-button btn-press bg-gradient-warm text-white">
+                  <Plus className="w-4 h-4 mr-2" /> Create Notice
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Notice</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Input
+                    placeholder=""
+                    value={formData.title}
+                    onChange={(e) =>
+                      setFormData({ ...formData, title: e.target.value })
+                    }
+                  />
+                  <Textarea
+                    placeholder=""
+                    value={formData.content}
+                    onChange={(e) =>
+                      setFormData({ ...formData, content: e.target.value })
+                    }
+                  />
+                  <div className="flex gap-4">
+                    <Select
+                      value={formData.type}
+                      onValueChange={(v) =>
+                        setFormData({ ...formData, type: v })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="INFO">Info</SelectItem>
+                        <SelectItem value="EVENT">Event</SelectItem>
+                        <SelectItem value="ALERT">Alert</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={formData.priority}
+                      onValueChange={(v) =>
+                        setFormData({ ...formData, priority: v })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Priority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="LOW">Low</SelectItem>
+                        <SelectItem value="MEDIUM">Medium</SelectItem>
+                        <SelectItem value="HIGH">High</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    onClick={handleCreate}
+                    className="w-full bg-gradient-warm text-white"
+                  >
+                    Post Notice
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         {loading ? (
           <Loader2 className="animate-spin mx-auto" />
         ) : (
           <div className="grid gap-4">
-            {notices.map((notice) => (
+            {filteredNotices.map((notice) => (
               <Card
-                key={notice._id}
+                key={notice.id}
                 className="shadow-soft hover:shadow-elevated transition-all border-l-4"
                 style={{
                   borderLeftColor:
@@ -204,7 +200,7 @@ const Notices = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleDelete(notice._id)}
+                    onClick={() => handleDelete(notice.id)}
                   >
                     <Trash2 className="w-4 h-4 text-red-500" />
                   </Button>
@@ -220,11 +216,36 @@ const Notices = () => {
                 </CardContent>
               </Card>
             ))}
-            {notices.length === 0 && (
+            {filteredNotices.length === 0 && (
               <p className="text-center text-muted-foreground">
-                No notices posted yet.
+                No notices found.
               </p>
             )}
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-end space-x-2 py-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1 || loading}
+            >
+              Previous
+            </Button>
+            <div className="text-sm text-muted-foreground w-20 text-center">
+              Page {page} of {totalPages}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages || loading}
+            >
+              Next
+            </Button>
           </div>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,27 +13,73 @@ import {
 } from "@/components/ui/card";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import api from "@/lib/api";
+import logo from "@/assets/logo.png";
+import { toast } from "@/hooks/use-toast";
 
 const Login = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     try {
-      const { data } = await api.post("/users/login", { email, password });
+      const { data } = await api.post("/auth/login", { email, password });
       if (data.success) {
-        localStorage.setItem("user", JSON.stringify(data.data.user));
-        const role = data.data.user.role.toLowerCase();
+        const user = data.data.user;
+
+        // Clear query cache to ensure no data bleeds from previous session
+        queryClient.clear();
+
+        // Store tokens first so the API interceptor can attach the Bearer token
+        localStorage.setItem("accessToken", data.data.accessToken);
+        localStorage.setItem("refreshToken", data.data.refreshToken);
+
+        // Fetch and attach society info (now authenticated via token)
+        if (user.societyId) {
+          try {
+            const societyRes = await api.get("/societies");
+            const society = societyRes.data.data?.find(
+              (s: { id: string }) => s.id === user.societyId,
+            );
+            user.society = society || null;
+          } catch {
+            // Non-blocking — society name is optional for login
+          }
+        }
+
+        localStorage.setItem("user", JSON.stringify(user));
+
+        // Enforce first-login password change
+        if (user.mustChangePassword) {
+          navigate("/change-password");
+          return;
+        }
+
+        const role = user.role.toLowerCase();
         if (role === "resident") navigate("/dashboard/resident");
-        else if (role === "admin") navigate("/dashboard/admin");
-        else if (role === "guard") navigate("/dashboard/guard");
+        else if (role === "admin") {
+          // If admin has no society yet, send to create/join
+          if (!user.societyId) {
+            navigate("/");
+          } else {
+            navigate("/dashboard/admin");
+          }
+        } else if (role === "guard") navigate("/dashboard/guard");
       }
-    } catch (error: any) {
-      console.error(error);
-      // Optional: Add toast error here
+    } catch (error: unknown) {
+      const e = error as { response?: { data?: { message?: string } } };
+      toast({
+        title: "Login Failed",
+        description: e?.response?.data?.message || "Invalid credentials",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -51,10 +98,12 @@ const Login = () => {
         <Card className="rounded-3xl shadow-elevated border-0 bg-card/95 backdrop-blur-sm">
           <CardHeader className="text-center pb-2">
             {/* Logo */}
-            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-warm flex items-center justify-center shadow-button">
-              <span className="text-primary-foreground font-bold text-2xl">
-                P
-              </span>
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center">
+              <img
+                src={logo}
+                alt="Parisar Connect"
+                className="w-full h-full object-contain"
+              />
             </div>
             <CardTitle className="text-2xl font-bold">
               Welcome back 👋
@@ -68,14 +117,15 @@ const Login = () => {
               {/* Email Field */}
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">
-                  Email or Phone
+                  Email
                 </Label>
                 <Input
                   id="email"
-                  type="text"
-                  placeholder="you@example.com"
+                  type="email"
+                  placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  required
                   className="rounded-xl h-12 bg-muted/50 border-0 focus-visible:ring-primary"
                 />
               </div>
@@ -97,9 +147,10 @@ const Login = () => {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
+                    placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    required
                     className="rounded-xl h-12 bg-muted/50 border-0 focus-visible:ring-primary pr-12"
                   />
                   <button
@@ -116,45 +167,13 @@ const Login = () => {
                 </div>
               </div>
 
-              {/* Demo Role Selection */}
-              <div className="space-y-2 pt-2">
-                <Label className="text-sm font-medium text-muted-foreground">
-                  Demo: Quick login as
-                </Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-xl h-10 text-sm font-medium hover:bg-soft-peach hover:border-primary hover:text-primary"
-                    onClick={() => navigate("/dashboard/resident")}
-                  >
-                    Resident
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-xl h-10 text-sm font-medium hover:bg-mint-green hover:border-secondary hover:text-secondary"
-                    onClick={() => navigate("/dashboard/admin")}
-                  >
-                    Admin
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-xl h-10 text-sm font-medium hover:bg-light-yellow hover:border-warm-orange hover:text-warm-orange"
-                    onClick={() => navigate("/dashboard/guard")}
-                  >
-                    Guard
-                  </Button>
-                </div>
-              </div>
-
               {/* Login Button */}
               <Button
                 type="submit"
+                disabled={loading}
                 className="w-full h-12 rounded-xl bg-gradient-warm text-primary-foreground font-bold text-base shadow-button btn-press"
               >
-                Login
+                {loading ? "Signing in..." : "Login"}
               </Button>
             </form>
 

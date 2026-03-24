@@ -3,8 +3,6 @@ import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ArrowRightLeft, Clock, User } from "lucide-react";
-import { toast } from "sonner";
-import api from "@/lib/api";
 import {
   Table,
   TableBody,
@@ -13,39 +11,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-interface Visitor {
-  _id: string;
-  name: string;
-  purpose: string;
-  wing: string;
-  flatNumber: string;
-  entryTime: string;
-  exitTime?: string;
-  status: "PENDING" | "APPROVED" | "ENTERED" | "EXITED";
-}
+import { Button } from "@/components/ui/button";
+import { Visitor } from "@/types";
+import { useVisitors } from "@/hooks/useQueries";
+import { safeParseJSON } from "@/lib/utils";
 
 const Visitors = () => {
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
-  useEffect(() => {
-    fetchVisitors();
-  }, []);
+  const { data, isLoading: loading } = useVisitors(page, limit);
+  const visitors = data?.data || [];
+  const totalPages = data?.totalPages || 1;
 
-  const fetchVisitors = async () => {
-    try {
-      const res = await api.get("/admin/visitors");
-      if (res.data.success) setVisitors(res.data.data);
-    } catch (error) {
-      toast.error("Failed to fetch visitor logs");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
 
   return (
-    <DashboardLayout role="admin">
+    <DashboardLayout role="admin" userName={user.name || "Admin"}>
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">Visitor Logs</h1>
 
@@ -70,7 +52,7 @@ const Visitors = () => {
                 </TableHeader>
                 <TableBody>
                   {visitors.map((visitor) => (
-                    <TableRow key={visitor._id}>
+                    <TableRow key={visitor.id}>
                       <TableCell className="font-medium">
                         {visitor.name}
                       </TableCell>
@@ -121,6 +103,31 @@ const Visitors = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-end space-x-2 py-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1 || loading}
+            >
+              Previous
+            </Button>
+            <div className="text-sm text-muted-foreground w-20 text-center">
+              Page {page} of {totalPages}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages || loading}
+            >
+              Next
+            </Button>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

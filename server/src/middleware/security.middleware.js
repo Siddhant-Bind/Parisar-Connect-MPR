@@ -3,6 +3,10 @@ import rateLimit from "express-rate-limit";
 import hpp from "hpp";
 import mongoSanitize from "express-mongo-sanitize";
 import morgan from "morgan";
+// NOTE: xss-clean was removed — it uses require() internally which crashes
+// in ESM ("type": "module") projects. Helmet CSP headers provide baseline XSS
+// protection, but CSP is NOT a substitute for proper input sanitization.
+// Sanitize user inputs at the application/validation layer as well.
 
 /**
  * Configure comprehensive security middleware for the Express app
@@ -37,10 +41,11 @@ export const configureSecurity = (app) => {
     app.use(morgan("combined")); // Standard Apache combined log for production
   }
 
-  // 5. General API Rate Limiting (100 requests per 10 minutes)
+  // 5. General API Rate Limiting
+  const isDev = process.env.NODE_ENV === "development";
   const apiLimiter = rateLimit({
     windowMs: 10 * 60 * 1000, // 10 minutes
-    max: 100, // Max 100 requests per window
+    max: isDev ? 1000 : 100, // 1000 in dev, 100 in production
     message: {
       success: false,
       message: "Too many requests from this IP, please try again later.",

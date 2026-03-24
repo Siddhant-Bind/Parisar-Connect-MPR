@@ -13,75 +13,23 @@ import { Input } from "@/components/ui/input";
 import { Search, Loader2, Trash2 } from "lucide-react";
 import { AddGuardModal } from "@/components/dashboard/AddGuardModal";
 import { toast } from "@/hooks/use-toast";
-import api from "@/lib/api";
-
-interface Guard {
-  _id: string;
-  name: string;
-  email: string;
-  contact: string;
-}
-
+import { useGuards } from "@/hooks/useQueries";
+import { useDeleteGuard } from "@/hooks/useMutations";
+import { safeParseJSON } from "@/lib/utils";
 const Guards = () => {
-  const [guards, setGuards] = useState<Guard[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
-  const fetchGuards = async () => {
-    setIsLoading(true);
-    try {
-      const response = await api.get("/admin/guards");
-      if (response.status === 200) {
-        setGuards(response.data.data);
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to fetch guards",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error(error);
-      toast({
-        title: "Error",
-        description: "Failed to connect to server",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { data, isLoading, refetch } = useGuards(page, limit);
+  const guards = data?.data || [];
+  const totalPages = data?.totalPages || 1;
 
-  useEffect(() => {
-    fetchGuards();
-  }, []);
+  const deleteGuardMutation = useDeleteGuard();
 
-  const deleteGuard = async (id: string) => {
+  const deleteGuard = (id: string) => {
     if (!confirm("Are you sure you want to delete this guard?")) return;
-
-    try {
-      const response = await api.delete(`/admin/guards/${id}`);
-
-      if (response.status === 200) {
-        toast({
-          title: "Success",
-          description: "Guard deleted successfully",
-        });
-        fetchGuards();
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to delete guard",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Something went wrong",
-        variant: "destructive",
-      });
-    }
+    deleteGuardMutation.mutate(id);
   };
 
   const filteredGuards = guards.filter(
@@ -91,22 +39,24 @@ const Guards = () => {
       guard.contact.includes(searchQuery),
   );
 
+  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
+
   return (
-    <DashboardLayout role="admin" userName="Admin User">
+    <DashboardLayout role="admin" userName={user.name || "Admin"}>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Guards</h1>
             <p className="text-muted-foreground">Manage security guards</p>
           </div>
-          <AddGuardModal onGuardAdded={fetchGuards} />
+          <AddGuardModal onGuardAdded={() => refetch()} />
         </div>
 
         <div className="flex items-center gap-2">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search guards..."
+              placeholder=""
               className="pl-8"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -142,7 +92,7 @@ const Guards = () => {
                 </TableRow>
               ) : (
                 filteredGuards.map((guard) => (
-                  <TableRow key={guard._id}>
+                  <TableRow key={guard.id}>
                     <TableCell className="font-medium">{guard.name}</TableCell>
                     <TableCell>{guard.contact}</TableCell>
                     <TableCell>{guard.email}</TableCell>
@@ -150,7 +100,7 @@ const Guards = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => deleteGuard(guard._id)}
+                        onClick={() => deleteGuard(guard.id)}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -161,6 +111,31 @@ const Guards = () => {
             </TableBody>
           </Table>
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-end space-x-2 py-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1 || isLoading}
+            >
+              Previous
+            </Button>
+            <div className="text-sm text-muted-foreground w-20 text-center">
+              Page {page} of {totalPages}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages || isLoading}
+            >
+              Next
+            </Button>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

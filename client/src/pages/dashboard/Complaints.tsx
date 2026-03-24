@@ -16,70 +16,70 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, MessageSquare, CheckCircle, Clock } from "lucide-react";
 import { toast } from "sonner";
-import api from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import {
+  Search,
+  Loader2,
+  MessageSquare,
+  CheckCircle,
+  Clock,
+} from "lucide-react";
+import { useComplaints } from "@/hooks/useQueries";
+import { useUpdateComplaintStatus } from "@/hooks/useMutations";
+import { safeParseJSON } from "@/lib/utils";
 
-interface Complaint {
-  _id: string;
-  title: string;
-  description: string;
-  category: string;
-  priority: "LOW" | "MEDIUM" | "HIGH";
-  status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "REJECTED";
-  createdAt: string;
-  resident?: {
-    name: string;
-    flatNumber: string;
-    wing: string;
-  };
-}
-
+import { Complaint } from "@/types";
 const Complaints = () => {
-  const [complaints, setComplaints] = useState<Complaint[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
-  useEffect(() => {
-    fetchComplaints();
-  }, []);
+  const { data, isLoading: loading } = useComplaints(page, limit);
+  const complaints = data?.data || [];
+  const totalPages = data?.totalPages || 1;
 
-  const fetchComplaints = async () => {
-    try {
-      const res = await api.get("/admin/complaints");
-      if (res.data.success) setComplaints(res.data.data);
-    } catch (error) {
-      toast.error("Failed to fetch complaints");
-    } finally {
-      setLoading(false);
-    }
+  const updateStatusMutation = useUpdateComplaintStatus();
+
+  const updateStatus = (id: string, status: string) => {
+    updateStatusMutation.mutate({ id, status });
   };
 
-  const updateStatus = async (id: string, status: string) => {
-    try {
-      const res = await api.patch(`/admin/complaints/${id}`, { status });
-      if (res.data.success) {
-        toast.success("Status updated");
-        setComplaints(
-          complaints.map((c) => (c._id === id ? { ...c, status } : c)),
-        );
-      }
-    } catch (error) {
-      toast.error("Failed to update status");
-    }
-  };
+  // TODO: Client-side search only filters the current page, not all complaints.
+  // Consider server-side search for complete results.
+  const filteredComplaints = complaints.filter(
+    (c) =>
+      c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.resident?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.resident?.flatNumber.includes(searchQuery),
+  );
+
+  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
 
   return (
-    <DashboardLayout role="admin">
+    <DashboardLayout role="admin" userName={user.name || "Admin"}>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Resident Complaints</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <h1 className="text-3xl font-bold">Resident Complaints</h1>
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by title, resident, unit..."
+              className="pl-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
 
         {loading ? (
           <Loader2 className="animate-spin mx-auto" />
         ) : (
           <div className="grid gap-4">
-            {complaints.map((complaint) => (
+            {filteredComplaints.map((complaint) => (
               <Card
-                key={complaint._id}
+                key={complaint.id}
                 className="shadow-soft hover:shadow-elevated transition-all"
               >
                 <CardHeader className="flex flex-row justify-between items-start pb-2">
@@ -101,8 +101,8 @@ const Complaints = () => {
                     </div>
                   </div>
                   <Select
-                    defaultValue={complaint.status}
-                    onValueChange={(val) => updateStatus(complaint._id, val)}
+                    value={complaint.status}
+                    onValueChange={(val) => updateStatus(complaint.id, val)}
                   >
                     <SelectTrigger className="w-[140px] h-8">
                       <SelectValue />
@@ -137,11 +137,36 @@ const Complaints = () => {
                 </CardContent>
               </Card>
             ))}
-            {complaints.length === 0 && (
+            {filteredComplaints.length === 0 && (
               <p className="text-center text-muted-foreground">
                 No complaints found.
               </p>
             )}
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-end space-x-2 py-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1 || loading}
+            >
+              Previous
+            </Button>
+            <div className="text-sm text-muted-foreground w-20 text-center">
+              Page {page} of {totalPages}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages || loading}
+            >
+              Next
+            </Button>
           </div>
         )}
       </div>

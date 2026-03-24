@@ -13,77 +13,23 @@ import { Input } from "@/components/ui/input";
 import { Search, Loader2, Trash2 } from "lucide-react";
 import { AddResidentModal } from "@/components/dashboard/AddResidentModal";
 import { toast } from "@/hooks/use-toast";
-import api from "@/lib/api";
-
-interface Resident {
-  _id: string;
-  name: string;
-  email: string;
-  contact: string;
-  wing: string;
-  flatNumber: string;
-}
-
+import { useResidents } from "@/hooks/useQueries";
+import { useDeleteResident } from "@/hooks/useMutations";
+import { safeParseJSON } from "@/lib/utils";
 const Residents = () => {
-  const [residents, setResidents] = useState<Resident[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
-  const fetchResidents = async () => {
-    setIsLoading(true);
-    try {
-      const response = await api.get("/admin/residents");
-      if (response.status === 200) {
-        setResidents(response.data.data);
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to fetch residents",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error(error);
-      toast({
-        title: "Error",
-        description: "Failed to connect to server",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { data, isLoading, refetch } = useResidents(page, limit);
+  const residents = data?.data || [];
+  const totalPages = data?.totalPages || 1;
 
-  useEffect(() => {
-    fetchResidents();
-  }, []);
+  const deleteResidentMutation = useDeleteResident();
 
-  const deleteResident = async (id: string) => {
+  const deleteResident = (id: string) => {
     if (!confirm("Are you sure you want to delete this resident?")) return;
-
-    try {
-      const response = await api.delete(`/admin/residents/${id}`);
-
-      if (response.status === 200) {
-        toast({
-          title: "Success",
-          description: "Resident deleted successfully",
-        });
-        fetchResidents();
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to delete resident",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Something went wrong",
-        variant: "destructive",
-      });
-    }
+    deleteResidentMutation.mutate(id);
   };
 
   const filteredResidents = residents.filter(
@@ -93,22 +39,24 @@ const Residents = () => {
       resident.flatNumber.includes(searchQuery),
   );
 
+  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
+
   return (
-    <DashboardLayout role="admin" userName="Admin User">
+    <DashboardLayout role="admin" userName={user.name || "Admin"}>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Residents</h1>
             <p className="text-muted-foreground">Manage colony residents</p>
           </div>
-          <AddResidentModal onResidentAdded={fetchResidents} />
+          <AddResidentModal onResidentAdded={() => refetch()} />
         </div>
 
         <div className="flex items-center gap-2">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search residents..."
+              placeholder=""
               className="pl-8"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -145,7 +93,7 @@ const Residents = () => {
                 </TableRow>
               ) : (
                 filteredResidents.map((resident) => (
-                  <TableRow key={resident._id}>
+                  <TableRow key={resident.id}>
                     <TableCell className="font-medium">
                       {resident.name}
                     </TableCell>
@@ -158,7 +106,7 @@ const Residents = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => deleteResident(resident._id)}
+                        onClick={() => deleteResident(resident.id)}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -169,6 +117,31 @@ const Residents = () => {
             </TableBody>
           </Table>
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-end space-x-2 py-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1 || isLoading}
+            >
+              Previous
+            </Button>
+            <div className="text-sm text-muted-foreground w-20 text-center">
+              Page {page} of {totalPages}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages || isLoading}
+            >
+              Next
+            </Button>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
