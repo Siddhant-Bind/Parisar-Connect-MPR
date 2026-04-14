@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,26 +14,13 @@ import {
   FileText,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import api from "@/lib/api";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Skeleton } from "@/components/ui/skeleton";
-
-interface Visitor {
-  id: string;
-  name: string;
-  wing: string;
-  flatNumber: string;
-  purpose: string;
-  visitorType?: string;
-  entryTime: string;
-  exitTime?: string;
-  status: "ENTERED" | "EXITED" | "PENDING" | "APPROVED";
-  documentImage?: string;
-  contact?: string;
-}
+import { useVisitors } from "@/hooks/useQueries";
+import { Visitor } from "@/types";
 
 const statusConfig = {
   ENTERED: { label: "Inside", color: "bg-emerald-500" },
@@ -44,38 +31,29 @@ const statusConfig = {
 
 export default function GuardDashboard() {
   const navigate = useNavigate();
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const { data: visitorsResponse, isLoading: loading } = useVisitors(1, 5);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const visitorsRes = await api.get("/visitors");
-        setVisitors(visitorsRes.data.data || []);
-      } catch (error) {
-        toast.error("Failed to load visitor data");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+  const visitors = useMemo(
+    () => visitorsResponse?.data ?? [],
+    [visitorsResponse],
+  ) as Visitor[];
 
   // Compute stats from real visitor data
   const today = new Date().toDateString();
   const visitorsToday = visitors.filter(
-    (v) => new Date(v.entryTime).toDateString() === today,
+    (v) => v.entryTime && new Date(v.entryTime).toDateString() === today,
   );
   const currentlyInside = visitors.filter((v) => v.status === "ENTERED");
   const recentVisitors = [...visitors]
     .sort(
       (a, b) =>
-        new Date(b.entryTime).getTime() - new Date(a.entryTime).getTime(),
+        new Date(b.entryTime ?? 0).getTime() -
+        new Date(a.entryTime ?? 0).getTime(),
     )
     .slice(0, 5);
 
-  const userName =
-    safeParseJSON<{name?: string}>(localStorage.getItem("user"), {}).name || "Guard";
+  const userName = user?.name || "Guard";
 
   return (
     <DashboardLayout role="guard" userName={userName}>
@@ -133,42 +111,42 @@ export default function GuardDashboard() {
           <div className="lg:col-span-2 space-y-8">
             {/* Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Card className="bg-blue-50/50 border-blue-100 hover:border-blue-200 transition-colors">
+              <Card className="bg-card border-border hover:border-blue-500/50 transition-colors shadow-sm">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <div className="p-3 bg-blue-100 rounded-xl text-blue-600">
+                    <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500">
                       <Users className="h-6 w-6" />
                     </div>
-                    <Badge className="bg-blue-100 text-blue-700 border-none hover:bg-blue-100">
+                    <Badge className="bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border-0">
                       Today
                     </Badge>
                   </div>
                   <div className="space-y-1">
-                    <h3 className="text-4xl font-bold text-blue-900">
+                    <h3 className="text-4xl font-bold text-foreground">
                       {loading ? "..." : visitorsToday.length}
                     </h3>
-                    <p className="text-sm text-blue-600 font-medium">
+                    <p className="text-sm text-blue-500 font-medium">
                       Total Entries
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-emerald-50/50 border-emerald-100 hover:border-emerald-200 transition-colors">
+              <Card className="bg-card border-border hover:border-emerald-500/50 transition-colors shadow-sm">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <div className="p-3 bg-emerald-100 rounded-xl text-emerald-600">
+                    <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500">
                       <Clock className="h-6 w-6" />
                     </div>
-                    <Badge className="bg-emerald-100 text-emerald-700 border-none hover:bg-emerald-100">
+                    <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-0">
                       Active
                     </Badge>
                   </div>
                   <div className="space-y-1">
-                    <h3 className="text-4xl font-bold text-emerald-900">
+                    <h3 className="text-4xl font-bold text-foreground">
                       {loading ? "..." : currentlyInside.length}
                     </h3>
-                    <p className="text-sm text-emerald-600 font-medium">
+                    <p className="text-sm text-emerald-500 font-medium">
                       Currently Inside
                     </p>
                   </div>
@@ -182,75 +160,75 @@ export default function GuardDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div
                   onClick={() => navigate("/dashboard/guard/todays-log")}
-                  className="group cursor-pointer p-5 bg-white rounded-2xl border border-gray-100 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-500/5 transition-all"
+                  className="group cursor-pointer p-5 bg-card rounded-2xl border border-border hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/10 transition-all"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100 transition-colors">
+                    <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20 transition-colors">
                       <LogOut className="h-6 w-6" />
                     </div>
                     <div>
-                      <h4 className="font-bold">Today's Log</h4>
+                      <h4 className="font-bold text-foreground">Today's Log</h4>
                       <p className="text-sm text-muted-foreground">
                         {loading
                           ? "..."
                           : `${visitorsToday.length} entries · ${currentlyInside.length} still inside`}
                       </p>
                     </div>
-                    <ChevronRight className="ml-auto h-5 w-5 text-gray-300 group-hover:text-emerald-500 transition-colors" />
+                    <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground/40 group-hover:text-emerald-500 transition-colors" />
                   </div>
                 </div>
 
                 <div
                   onClick={() => navigate("/dashboard/guard/history")}
-                  className="group cursor-pointer p-5 bg-white rounded-2xl border border-gray-100 hover:border-purple-200 hover:shadow-lg hover:shadow-purple-500/5 transition-all"
+                  className="group cursor-pointer p-5 bg-card rounded-2xl border border-border hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/10 transition-all"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-purple-50 text-purple-600 group-hover:bg-purple-100 transition-colors">
+                    <div className="p-3 rounded-xl bg-purple-500/10 text-purple-500 group-hover:bg-purple-500/20 transition-colors">
                       <History className="h-6 w-6" />
                     </div>
                     <div>
-                      <h4 className="font-bold">Full History</h4>
+                      <h4 className="font-bold text-foreground">Full History</h4>
                       <p className="text-sm text-muted-foreground">
                         {loading ? "..." : `${visitors.length} total records`}
                       </p>
                     </div>
-                    <ChevronRight className="ml-auto h-5 w-5 text-gray-300 group-hover:text-purple-500 transition-colors" />
+                    <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground/40 group-hover:text-purple-500 transition-colors" />
                   </div>
                 </div>
 
                 <div
                   onClick={() => navigate("/dashboard/guard/pre-approved")}
-                  className="group cursor-pointer p-5 bg-white rounded-2xl border border-gray-100 hover:border-blue-200 hover:shadow-lg hover:shadow-blue-500/5 transition-all"
+                  className="group cursor-pointer p-5 bg-card rounded-2xl border border-border hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/10 transition-all"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-100 transition-colors">
+                    <div className="p-3 rounded-xl bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20 transition-colors">
                       <FileText className="h-6 w-6" />
                     </div>
                     <div>
-                      <h4 className="font-bold">Pre-Approved</h4>
+                      <h4 className="font-bold text-foreground">Pre-Approved</h4>
                       <p className="text-sm text-muted-foreground">
                         Check resident approvals
                       </p>
                     </div>
-                    <ChevronRight className="ml-auto h-5 w-5 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                    <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground/40 group-hover:text-blue-500 transition-colors" />
                   </div>
                 </div>
 
                 <div
                   onClick={() => navigate("/dashboard/guard/visitors")}
-                  className="group cursor-pointer p-5 bg-white rounded-2xl border border-gray-100 hover:border-orange-200 hover:shadow-lg hover:shadow-orange-500/5 transition-all"
+                  className="group cursor-pointer p-5 bg-card rounded-2xl border border-border hover:border-orange-500/50 hover:shadow-lg hover:shadow-orange-500/10 transition-all"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-orange-50 text-orange-600 group-hover:bg-orange-100 transition-colors">
+                    <div className="p-3 rounded-xl bg-orange-500/10 text-orange-500 group-hover:bg-orange-500/20 transition-colors">
                       <Car className="h-6 w-6" />
                     </div>
                     <div>
-                      <h4 className="font-bold">All Visitors</h4>
+                      <h4 className="font-bold text-foreground">All Visitors</h4>
                       <p className="text-sm text-muted-foreground">
                         Manage all entries
                       </p>
                     </div>
-                    <ChevronRight className="ml-auto h-5 w-5 text-gray-300 group-hover:text-orange-500 transition-colors" />
+                    <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground/40 group-hover:text-orange-500 transition-colors" />
                   </div>
                 </div>
               </div>
@@ -259,12 +237,23 @@ export default function GuardDashboard() {
 
           {/* Right — Live Activity Feed */}
           <div className="lg:col-span-1">
-            <Card className="h-full border-none shadow-lg bg-gray-900 text-white">
+            <Card className="h-full shadow-lg border bg-card text-card-foreground">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Clock className="h-5 w-5 text-orange-500" />
                   Live Activity
                 </CardTitle>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Inside
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span className="w-2 h-2 rounded-full bg-gray-400" /> Exited
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" /> Approved
+                  </span>
+                </div>
               </CardHeader>
               <CardContent className="px-2">
                 <div className="space-y-3">
@@ -272,12 +261,12 @@ export default function GuardDashboard() {
                     Array.from({ length: 4 }).map((_, i) => (
                       <Skeleton
                         key={i}
-                        className="h-16 rounded-xl bg-white/10"
+                        className="h-16 rounded-xl bg-muted"
                       />
                     ))
                   ) : recentVisitors.length === 0 ? (
-                    <div className="text-gray-400 text-center py-10 flex flex-col items-center gap-2">
-                      <Shield className="h-8 w-8 text-gray-600" />
+                    <div className="text-muted-foreground text-center py-10 flex flex-col items-center gap-2">
+                      <Shield className="h-8 w-8 text-muted-foreground/60" />
                       <p>No activity yet</p>
                     </div>
                   ) : (
@@ -287,12 +276,12 @@ export default function GuardDashboard() {
                       return (
                         <div
                           key={visitor.id}
-                          className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/5"
+                          className="p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors border border-border/50"
                         >
                           <div className="flex justify-between items-start mb-1.5">
                             <div className="flex items-center gap-2">
                               <User className="h-4 w-4 text-orange-400 flex-shrink-0" />
-                              <span className="font-semibold text-sm truncate max-w-[120px]">
+                              <span className="font-semibold text-sm truncate max-w-[120px] text-foreground">
                                 {visitor.name}
                               </span>
                             </div>
@@ -300,19 +289,19 @@ export default function GuardDashboard() {
                               <span
                                 className={`w-2 h-2 rounded-full ${cfg.color}`}
                               />
-                              <span className="text-[10px] text-gray-400 font-medium">
+                              <span className="text-[10px] text-muted-foreground font-medium">
                                 {cfg.label}
                               </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <MapPin className="h-3 w-3 flex-shrink-0" />
                             <span>
                               {visitor.wing}-{visitor.flatNumber}
                             </span>
-                            <span className="w-1 h-1 rounded-full bg-gray-600" />
+                            <span className="w-1 h-1 rounded-full bg-muted-foreground/40" />
                             <span className="truncate">{visitor.purpose}</span>
-                            <span className="ml-auto text-gray-500 font-mono">
+                            <span className="ml-auto text-muted-foreground font-mono">
                               {new Date(visitor.entryTime).toLocaleTimeString(
                                 [],
                                 {

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { UserCheck, Clock, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 
 interface PendingAdmin {
   id: string;
@@ -18,7 +18,7 @@ const AdminApprovals = () => {
   const [pendingAdmins, setPendingAdmins] = useState<PendingAdmin[]>([]);
   const [loading, setLoading] = useState(true);
   const [approvingId, setApprovingId] = useState<string | null>(null);
-  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
+  const { user } = useAuth();
 
   // Check if current user is Creator (we can infer this if they are approved and role is ADMIN)
   // Actually, better to just let the backend decide if they have access.

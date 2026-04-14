@@ -30,12 +30,21 @@ import {
 import { Notice } from "@/types";
 import { useNotices } from "@/hooks/useQueries";
 import { useCreateNotice, useDeleteNotice } from "@/hooks/useMutations";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 
 const Notices = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const limit = 10;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -45,7 +54,7 @@ const Notices = () => {
     priority: "MEDIUM",
   });
 
-  const { data, isLoading: loading } = useNotices(page, limit);
+  const { data, isLoading: loading } = useNotices(page, limit, debouncedSearch);
   const notices = data?.data || [];
   const totalPages = data?.totalPages || 1;
 
@@ -70,13 +79,9 @@ const Notices = () => {
     deleteNoticeMutation.mutate(id);
   };
 
-  const filteredNotices = notices.filter(
-    (n) =>
-      n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      n.content.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const filteredNotices = notices;
 
-  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
+  const { user } = useAuth();
 
   return (
     <DashboardLayout role="admin" userName={user.name || "Admin"}>
@@ -105,14 +110,14 @@ const Notices = () => {
                 </DialogHeader>
                 <div className="space-y-4">
                   <Input
-                    placeholder=""
+                    placeholder="Notice Title..."
                     value={formData.title}
                     onChange={(e) =>
                       setFormData({ ...formData, title: e.target.value })
                     }
                   />
                   <Textarea
-                    placeholder=""
+                    placeholder="Enter full notice content here..."
                     value={formData.content}
                     onChange={(e) =>
                       setFormData({ ...formData, content: e.target.value })
@@ -152,9 +157,14 @@ const Notices = () => {
                   </div>
                   <Button
                     onClick={handleCreate}
+                    disabled={createNoticeMutation.isPending}
                     className="w-full bg-gradient-warm text-white"
                   >
-                    Post Notice
+                    {createNoticeMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Posting...</>
+                    ) : (
+                      "Post Notice"
+                    )}
                   </Button>
                 </div>
               </DialogContent>
@@ -206,12 +216,27 @@ const Notices = () => {
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-foreground/80">{notice.content}</p>
-                  <div className="mt-4 flex items-center text-xs text-muted-foreground gap-4">
+                  <p className="text-foreground/80 whitespace-pre-wrap text-sm line-clamp-3">
+                    {notice.content.length > 150 ? `${notice.content.substring(0, 150)}...` : notice.content}
+                  </p>
+                  <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground gap-4">
                     <span className="flex items-center gap-1">
                       <Megaphone className="w-3 h-3" /> Priority:{" "}
                       {notice.priority}
                     </span>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="link" size="sm" className="h-auto p-0 text-primary font-semibold">View</Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>{notice.title}</DialogTitle>
+                        </DialogHeader>
+                        <div className="mt-4 whitespace-pre-wrap text-sm text-foreground/90 max-h-[60vh] overflow-y-auto">
+                          {notice.content}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </CardContent>
               </Card>

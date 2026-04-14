@@ -25,51 +25,65 @@ const extractData = <T>(res: GenericResponse<T>): { data: T[]; totalPages?: numb
   return { data: res.data as T[], totalPages: 1 };
 };
 
-export const useNotices = (page = 1, limit = 10) => {
+export const useNotices = (page = 1, limit = 10, search = "") => {
   return useQuery({
-    queryKey: ["notices", page, limit],
+    queryKey: ["notices", page, limit, search],
     queryFn: async () => {
-      const { data } = await api.get<GenericResponse<Notice>>(`/notices?page=${page}&limit=${limit}`);
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (search) params.append("search", search);
+      const { data } = await api.get<GenericResponse<Notice>>(`/notices?${params}`);
       return extractData(data);
     },
+    refetchInterval: 15000,
   });
 };
 
-export const useComplaints = (page = 1, limit = 10) => {
+export const useComplaints = (page = 1, limit = 10, search = "") => {
   return useQuery({
-    queryKey: ["complaints", page, limit],
+    queryKey: ["complaints", page, limit, search],
     queryFn: async () => {
-      const { data } = await api.get<GenericResponse<Complaint>>(`/complaints?page=${page}&limit=${limit}`);
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (search) params.append("search", search);
+      const { data } = await api.get<GenericResponse<Complaint>>(`/complaints?${params}`);
       return extractData(data);
     },
+    refetchInterval: 15000,
   });
 };
 
-export const useVisitors = (page = 1, limit = 10) => {
+export const useVisitors = (page = 1, limit = 10, search = "") => {
   return useQuery({
-    queryKey: ["visitors", page, limit],
+    queryKey: ["visitors", page, limit, search],
     queryFn: async () => {
-      const { data } = await api.get<GenericResponse<Visitor>>(`/visitors?page=${page}&limit=${limit}`);
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (search) params.append("search", search);
+      const { data } = await api.get<GenericResponse<Visitor>>(`/visitors?${params}`);
       return extractData(data);
     },
+    refetchInterval: 15000,
   });
 };
 
-export const usePayments = (page = 1, limit = 10) => {
+export const usePayments = (page = 1, limit = 10, search = "") => {
   return useQuery({
-    queryKey: ["payments", page, limit],
+    queryKey: ["payments", page, limit, search],
     queryFn: async () => {
-      const { data } = await api.get<GenericResponse<Payment>>(`/payments?page=${page}&limit=${limit}`);
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (search) params.append("search", search);
+      const { data } = await api.get<GenericResponse<Payment>>(`/payments?${params}`);
       return extractData(data);
     },
+    refetchInterval: 15000,
   });
 };
 
-export const useResidents = (page = 1, limit = 10) => {
+export const useResidents = (page = 1, limit = 10, search = "") => {
   return useQuery({
-    queryKey: ["residents", page, limit],
+    queryKey: ["residents", page, limit, search],
     queryFn: async () => {
-      const { data } = await api.get<GenericResponse<User>>(`/residents?page=${page}&limit=${limit}`);
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (search) params.append("search", search);
+      const { data } = await api.get<GenericResponse<User>>(`/residents?${params}`);
       return extractData(data);
     },
   });
@@ -93,6 +107,18 @@ export const useDashboardStats = () => {
       // The endpoint returns { success: boolean, data: { ...stats } }
       return data.data; // return the actual stats object
     },
+    refetchInterval: 15000,
+  });
+};
+
+export const useRecentActivity = () => {
+  return useQuery({
+    queryKey: ["recentActivity"],
+    queryFn: async () => {
+      const { data } = await api.get("/dashboard/activity");
+      return data.data;
+    },
+    refetchInterval: 15000,
   });
 };
 

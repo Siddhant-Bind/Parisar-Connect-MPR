@@ -14,9 +14,18 @@ export const createVisitorSchema = z.object({
       .max(500),
     wing: z.string().min(1, "Wing is required").max(10),
     flatNumber: z.string().min(1, "Flat number is required").max(10),
-    contact: z.string().optional().or(z.literal("")), // allow empty strings
+    contact: z
+      .string()
+      .regex(/^(\+91)?\d{10}$/, "Invalid phone number (10 digits, optional +91 prefix)")
+      .optional()
+      .or(z.literal("")), // allow empty strings
     visitorType: z.string().optional(), // allow string from form, or optional
-    vehicleNumber: z.string().max(20).optional().or(z.literal("")),
+    vehicleNumber: z
+      .string()
+      .max(20)
+      .regex(/^[A-Za-z0-9\s-]*$/, "Vehicle number must be alphanumeric")
+      .optional()
+      .or(z.literal("")),
     documentImage: z.string().optional().or(z.literal("")).nullable(),
   }),
 });

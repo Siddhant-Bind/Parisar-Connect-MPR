@@ -13,23 +13,15 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { Notice, Visitor } from "@/types";
+import { Notice, Visitor, Payment } from "@/types";
 import { useNotices, useVisitors, usePayments } from "@/hooks/useQueries";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 
 const ResidentDashboard = () => {
-  const [stats, setStats] = useState({
-    noticesCount: 0,
-    visitorsToday: 0,
-    dueAmount: 0,
-    eventsCount: 0,
-  });
-  const [announcements, setAnnouncements] = useState<Notice[]>([]);
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
-  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const { data: noticesResp, isLoading: load1 } = useNotices(1, 10);
@@ -38,37 +30,34 @@ const ResidentDashboard = () => {
 
   const loading = load1 || load2 || load3;
 
-  useEffect(() => {
-    if (loading) return;
+  const announcements = useMemo(
+    () => (noticesResp?.data?.slice(0, 3) ?? []) as Notice[],
+    [noticesResp],
+  );
 
-    if (noticesResp?.data) {
-      setStats((prev) => ({ ...prev, noticesCount: noticesResp.data.length }));
-      setAnnouncements(noticesResp.data.slice(0, 3));
-    }
+  const visitors = useMemo(
+    () => (visitorsResp?.data?.slice(0, 3) ?? []) as Visitor[],
+    [visitorsResp],
+  );
 
-    if (visitorsResp?.data) {
-      const today = new Date().toDateString();
-      const todayVisitors = visitorsResp.data.filter(
-        (v: any) => new Date(v.entryTime).toDateString() === today,
-      );
-      setStats((prev) => ({
-        ...prev,
-        visitorsToday: todayVisitors.length,
-      }));
-      setVisitors(visitorsResp.data.slice(0, 3));
-    }
+  const stats = useMemo(() => {
+    const noticesCount = noticesResp?.data?.length ?? 0;
 
-    if (paymentsResp?.data) {
-      const pending = paymentsResp.data.filter(
-        (p: any) => p.status === "PENDING",
-      );
-      const totalDue = pending.reduce(
-        (sum: number, p: any) => sum + p.amount,
-        0,
-      );
-      setStats((prev) => ({ ...prev, dueAmount: totalDue }));
-    }
-  }, [loading, noticesResp, visitorsResp, paymentsResp]);
+    const today = new Date().toDateString();
+    const visitorsToday = (visitorsResp?.data ?? []).filter(
+      (v: Visitor) => v.entryTime && new Date(v.entryTime).toDateString() === today,
+    ).length;
+
+    const pending = (paymentsResp?.data ?? []).filter(
+      (p: Payment) => p.status === "PENDING",
+    );
+    const dueAmount = pending.reduce(
+      (sum: number, p: Payment) => sum + p.amount,
+      0,
+    );
+
+    return { noticesCount, visitorsToday, dueAmount, eventsCount: 0 };
+  }, [noticesResp, visitorsResp, paymentsResp]);
 
   if (loading) {
     return (
@@ -94,7 +83,7 @@ const ResidentDashboard = () => {
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in-delay-1">
-          <Card className="rounded-2xl border-0 shadow-card bg-soft-peach/50">
+          <Card onClick={() => navigate("/dashboard/resident/notices")} className="rounded-2xl border-0 shadow-card bg-soft-peach/50 cursor-pointer hover:shadow-elevated transition-shadow">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
@@ -110,7 +99,7 @@ const ResidentDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-0 shadow-card bg-mint-green/50">
+          <Card onClick={() => navigate("/dashboard/resident/visitors")} className="rounded-2xl border-0 shadow-card bg-mint-green/50 cursor-pointer hover:shadow-elevated transition-shadow">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-secondary/20 flex items-center justify-center">
@@ -128,7 +117,7 @@ const ResidentDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-0 shadow-card bg-light-yellow/50">
+          <Card onClick={() => navigate("/dashboard/resident/payments")} className="rounded-2xl border-0 shadow-card bg-light-yellow/50 cursor-pointer hover:shadow-elevated transition-shadow">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-warm-orange/20 flex items-center justify-center">
@@ -187,6 +176,7 @@ const ResidentDashboard = () => {
               {announcements.map((item) => (
                 <div
                   key={item.id}
+                  onClick={() => navigate("/dashboard/resident/notices")}
                   className="flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-3">

@@ -48,16 +48,26 @@ const getAllNotices = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = Math.max(1, parseInt(req.query.limit) || 10);
   const skip = (page - 1) * limit;
+  const search = req.query.search || "";
+
+  const whereClause = { societyId: req.user.societyId, deletedAt: null };
+
+  if (search) {
+    whereClause.OR = [
+      { title: { contains: search, mode: "insensitive" } },
+      { content: { contains: search, mode: "insensitive" } },
+    ];
+  }
 
   const [notices, total] = await Promise.all([
     prisma.notice.findMany({
-      where: { societyId: req.user.societyId, deletedAt: null },
+      where: whereClause,
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
     }),
     prisma.notice.count({
-      where: { societyId: req.user.societyId, deletedAt: null },
+      where: whereClause,
     }),
   ]);
 

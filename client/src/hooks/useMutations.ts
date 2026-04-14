@@ -41,12 +41,37 @@ export const useUpdateComplaintStatus = () => {
       const res = await api.patch(`/complaints/${id}/status`, { status });
       return res.data;
     },
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["complaints"] });
+      const previousComplaints = queryClient.getQueriesData({ queryKey: ["complaints"] });
+
+      queryClient.setQueriesData({ queryKey: ["complaints"] }, (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data?.map((c: any) => 
+            c.id === id ? { ...c, status } : c
+          )
+        };
+      });
+
+      return { previousComplaints };
+    },
     onSuccess: () => {
       toast.success("Status updated");
-      queryClient.invalidateQueries({ queryKey: ["complaints"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
     },
-    onError: (error: AxiosError<{ message: string }>) => toast.error(error.response?.data?.message || "Failed to update status"),
+    onError: (error: AxiosError<{ message: string }>, _variables, context: any) => {
+      if (context?.previousComplaints) {
+        context.previousComplaints.forEach(([queryKey, data]: [any, any]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      toast.error(error.response?.data?.message || "Failed to update status");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["complaints"], exact: false });
+    },
   });
 };
 
@@ -100,12 +125,33 @@ export const useUpdateVisitorStatus = () => {
       const res = await api.patch(`/visitors/${id}/status`, { status });
       return res.data;
     },
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["visitors"] });
+      const previousVisitors = queryClient.getQueriesData({ queryKey: ["visitors"] });
+
+      queryClient.setQueriesData({ queryKey: ["visitors"] }, (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data?.map((v: any) => v.id === id ? { ...v, status } : v)
+        };
+      });
+      return { previousVisitors };
+    },
     onSuccess: () => {
       toast.success("Visitor status updated");
+    },
+    onError: (error: AxiosError<{ message: string }>, _variables, context: any) => {
+      if (context?.previousVisitors) {
+        context.previousVisitors.forEach(([queryKey, data]: [any, any]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      toast.error(error.response?.data?.message || "Failed to update status");
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["visitors"], exact: false });
     },
-    onError: (error: AxiosError<{ message: string }>) =>
-      toast.error(error.response?.data?.message || "Failed to update status"),
   });
 };
 
@@ -116,12 +162,33 @@ export const useMarkVisitorExit = () => {
       const res = await api.patch(`/visitors/${id}/exit`);
       return res.data;
     },
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["visitors"] });
+      const previousVisitors = queryClient.getQueriesData({ queryKey: ["visitors"] });
+
+      queryClient.setQueriesData({ queryKey: ["visitors"] }, (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data?.map((v: any) => v.id === id ? { ...v, status: 'EXITED' } : v)
+        };
+      });
+      return { previousVisitors };
+    },
     onSuccess: () => {
       toast.success("Visitor exit logged");
+    },
+    onError: (error: AxiosError<{ message: string }>, _variables, context: any) => {
+      if (context?.previousVisitors) {
+        context.previousVisitors.forEach(([queryKey, data]: [any, any]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      toast.error(error.response?.data?.message || "Failed to mark exit");
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["visitors"], exact: false });
     },
-    onError: (error: AxiosError<{ message: string }>) =>
-      toast.error(error.response?.data?.message || "Failed to mark exit"),
   });
 };
 
@@ -134,11 +201,33 @@ export const useMarkPaymentPaid = () => {
       const res = await api.patch(`/payments/${id}/pay`);
       return res.data;
     },
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["payments"] });
+      const previousPayments = queryClient.getQueriesData({ queryKey: ["payments"] });
+
+      queryClient.setQueriesData({ queryKey: ["payments"] }, (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data?.map((p: any) => p.id === id ? { ...p, status: 'PAID' } : p)
+        };
+      });
+      return { previousPayments };
+    },
     onSuccess: () => {
       toast.success("Payment marked as PAID");
+    },
+    onError: (error: AxiosError<{ message: string }>, _variables, context: any) => {
+      if (context?.previousPayments) {
+        context.previousPayments.forEach(([queryKey, data]: [any, any]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      toast.error(error.response?.data?.message || "Failed to update payment status");
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["payments"], exact: false });
     },
-    onError: (error: AxiosError<{ message: string }>) => toast.error(error.response?.data?.message || "Failed to update payment status"),
   });
 };
 
@@ -147,12 +236,12 @@ export const useCreatePaymentRequest = () => {
   return useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
       // Bulk or individual
-      if (Array.isArray(data.residentIds) && data.residentIds[0] === "ALL") {
+      if (data.residentId === "ALL") {
         const res = await api.post("/payments/bulk", {
-          month: data.month,
           amount: data.amount,
-          dueDate: data.dueDate,
           type: data.type,
+          dueDate: data.dueDate,
+          month: data.month,
         });
         return res.data;
       } else {

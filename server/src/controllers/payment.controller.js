@@ -61,10 +61,32 @@ const getAllPayments = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
   const skip = (page - 1) * limit;
+  const search = req.query.search?.trim() || "";
 
-  const filter = { societyId: req.user.societyId, deletedAt: null };
+  // Build the base filter
+  const baseFilter = { societyId: req.user.societyId, deletedAt: null };
   if (req.user.role === "RESIDENT") {
-    filter.residentId = req.user.id;
+    baseFilter.residentId = req.user.id;
+  }
+
+  // Build the final where clause — combine base filter with search using AND
+  let filter;
+  if (search) {
+    filter = {
+      AND: [
+        baseFilter,
+        {
+          OR: [
+            { type: { contains: search, mode: "insensitive" } },
+            { month: { contains: search, mode: "insensitive" } },
+            { resident: { name: { contains: search, mode: "insensitive" } } },
+            { resident: { flatNumber: { contains: search, mode: "insensitive" } } },
+          ],
+        },
+      ],
+    };
+  } else {
+    filter = baseFilter;
   }
 
   const [payments, total] = await Promise.all([

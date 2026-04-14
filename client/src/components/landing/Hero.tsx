@@ -4,11 +4,11 @@ import { Building2, Users, ShieldCheck, Sparkles } from "lucide-react";
 
 const Hero = () => {
   return (
-    <section className="min-h-screen bg-gradient-hero pt-32 pb-20 px-4 overflow-hidden">
+    <section className="lg:min-h-screen bg-gradient-hero pt-32 pb-16 lg:pb-20 px-4 overflow-hidden">
       <div className="container mx-auto">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
           {/* Left Content */}
-          <div className="max-w-xl animate-fade-in-up">
+          <div className="max-w-xl mx-auto text-center lg:text-left animate-fade-in-up">
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-foreground leading-tight mb-6">
               Live peacefully.{" "}
               <span className="text-primary block lg:inline">Stay connected.</span>
@@ -16,13 +16,13 @@ const Hero = () => {
             <p className="text-md sm:text-xl text-muted-foreground mb-8 leading-relaxed">
               Everything your society needs — residents, security, and
               management — in one place.
-              <div className="block sm:inline"> Simple tools for peaceful
-              community living.</div>
+              <span className="block sm:inline"> Simple tools for peaceful
+              community living.</span>
             </p>
-            <div className="flex flex-col gap-3 w-[calc(100%-3.3rem)] sm:flex-row sm:gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 justify-center lg:justify-start">
               <Button
                 size="lg"
-                className="bg-gradient-warm text-primary-foreground rounded-xl shadow-button btn-press font-bold text-lg px-8 py-6"
+                className="bg-gradient-warm text-primary-foreground rounded-xl shadow-button btn-press font-bold text-lg px-8 py-6 w-full sm:w-auto"
                 asChild
               >
                 <Link to="/signup">Get Started</Link>
@@ -30,7 +30,7 @@ const Hero = () => {
               <Button
                 size="lg"
                 variant="outline"
-                className="rounded-xl font-semibold text-lg px-8 py-6 border-2 hover:bg-accent"
+                className="rounded-xl font-semibold text-lg px-8 py-6 border-2 hover:bg-accent w-full sm:w-auto"
                 asChild
               >
                 <Link to="/login">Login</Link>
@@ -38,7 +38,7 @@ const Hero = () => {
             </div>
 
             {/* Trust badges */}
-            <div className="mt-12 flex items-center gap-6 text-muted-foreground">
+            <div className="mt-12 flex flex-wrap items-center justify-center lg:justify-start gap-4 sm:gap-6 text-muted-foreground">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-secondary" />
                 <span className="text-sm font-medium">Secure</span>
@@ -55,7 +55,7 @@ const Hero = () => {
           </div>
 
           {/* Right Illustration */}
-          <div className="relative animate-fade-in-delay-2">
+          <div className="hidden md:block relative animate-fade-in-delay-2">
             <div className="relative w-full max-w-lg mx-auto">
               {/* Main illustration container */}
               <div className="aspect-square rounded-3xl bg-gradient-to-br from-soft-peach via-light-yellow to-mint-green p-8 shadow-elevated">

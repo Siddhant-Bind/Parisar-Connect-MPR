@@ -27,7 +27,7 @@ import {
   FileText,
 } from "lucide-react";
 import { useReportStats } from "@/hooks/useQueries";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 
 const CHART_COLORS = {
   primary: "hsl(var(--primary))",
@@ -42,7 +42,7 @@ const CHART_COLORS = {
 const PIE_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ec4899", "#8b5cf6"];
 
 const Reports = () => {
-  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
+  const { user } = useAuth();
   const { data: stats, isLoading } = useReportStats();
 
   const summary = stats?.summary || {};
@@ -424,9 +424,9 @@ const Reports = () => {
                   {topCategories.length === 0 ? (
                     <EmptyChart message="No complaints filed yet" />
                   ) : (
-                    <div className="h-[280px] flex items-center gap-4">
+                    <div className="h-auto md:h-[280px] flex flex-col md:flex-row items-center gap-6 py-4 md:py-0">
                       {/* Pie Chart */}
-                      <div className="w-1/2 h-full">
+                      <div className="w-full md:w-1/2 h-[220px] md:h-full">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
@@ -454,7 +454,7 @@ const Reports = () => {
                         </ResponsiveContainer>
                       </div>
                       {/* Legend List */}
-                      <div className="w-1/2 space-y-3">
+                      <div className="w-full md:w-1/2 space-y-3">
                         {topCategories.map(
                           (
                             cat: { category: string; count: number },

@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ArrowRightLeft, Clock, User } from "lucide-react";
+import { Loader2, ArrowRightLeft, Clock, User, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -14,22 +15,43 @@ import {
 import { Button } from "@/components/ui/button";
 import { Visitor } from "@/types";
 import { useVisitors } from "@/hooks/useQueries";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 
 const Visitors = () => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const limit = 10;
 
-  const { data, isLoading: loading } = useVisitors(page, limit);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const { data, isLoading: loading } = useVisitors(page, limit, debouncedSearch);
   const visitors = data?.data || [];
   const totalPages = data?.totalPages || 1;
 
-  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
+  const { user } = useAuth();
 
   return (
     <DashboardLayout role="admin" userName={user.name || "Admin"}>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Visitor Logs</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <h1 className="text-3xl font-bold">Visitor Logs</h1>
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search visitors..."
+              className="pl-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
 
         <Card className="shadow-soft border-0">
           <CardHeader>

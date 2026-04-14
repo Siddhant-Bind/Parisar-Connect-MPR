@@ -182,9 +182,9 @@
     --soft-blue: 174 63% 55%;
     --deep-navy: 220 39% 30%;
 
-    --light-yellow: 45 100% 25%; /* darker for background use */
-    --soft-peach: 15 50% 25%;
-    --mint-green: 140 30% 20%;
+    --light-yellow: 45 80% 30%; /* adjusted for contrast */
+    --soft-peach: 15 50% 30%;
+    --mint-green: 140 30% 25%;
 
     --off-white: 0 0% 12%;
     --light-beige: 30 20% 14%;
@@ -232,7 +232,7 @@
 
   .dark input::placeholder,
   .dark textarea::placeholder {
-    color: hsl(0 0% 45%);
+    color: hsl(0 0% 65%);
     opacity: 1;
   }
 }

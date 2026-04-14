@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 import { Card, CardContent } from "@/components/ui/card";
 import { AxiosError } from "axios";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -125,7 +125,7 @@ export default function AddVisitorPage() {
   };
 
   const userName =
-    safeParseJSON<{name?: string}>(localStorage.getItem("user"), {}).name || "Guard";
+    useAuth().user?.name || "Guard";
 
   return (
     <DashboardLayout role="guard" userName={userName}>
@@ -212,7 +212,7 @@ export default function AddVisitorPage() {
                       <Input
                         id="name"
                         required
-                        placeholder="Enter your name"
+                        placeholder=""
                         className="bg-gray-50 border-gray-200 focus:bg-white h-12 rounded-xl"
                         value={formData.name}
                         onChange={(e) => setField("name", e.target.value)}
@@ -235,8 +235,8 @@ export default function AddVisitorPage() {
                     <Label>Visiting Unit *</Label>
                     <div className="flex gap-3">
                       <Input
-                        placeholder=""
-                        className="w-28 bg-gray-50 border-gray-200 focus:bg-white h-12 rounded-xl uppercase"
+                        placeholder="Block"
+                        className="w-28 bg-gray-50 border-gray-200 focus:bg-white h-12 rounded-xl uppercase placeholder:text-gray-400"
                         required
                         value={formData.wing}
                         onChange={(e) =>
@@ -244,8 +244,8 @@ export default function AddVisitorPage() {
                         }
                       />
                       <Input
-                        placeholder=""
-                        className="flex-1 bg-gray-50 border-gray-200 focus:bg-white h-12 rounded-xl"
+                        placeholder="Flat No."
+                        className="flex-1 bg-gray-50 border-gray-200 focus:bg-white h-12 rounded-xl placeholder:text-gray-400"
                         required
                         value={formData.flatNumber}
                         onChange={(e) => setField("flatNumber", e.target.value)}
@@ -266,8 +266,8 @@ export default function AddVisitorPage() {
                     </Label>
                     <Input
                       id="vehicle"
-                      placeholder=""
-                      className="bg-gray-50 border-gray-200 focus:bg-white h-12 rounded-xl uppercase tracking-widest"
+                      placeholder="e.g. MH 12 AB 1234"
+                      className="bg-gray-50 border-gray-200 focus:bg-white h-12 rounded-xl uppercase tracking-widest placeholder:text-gray-400 placeholder:tracking-normal"
                       value={formData.vehicleNumber}
                       onChange={(e) =>
                         setField("vehicleNumber", e.target.value.toUpperCase())

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,12 +13,12 @@ import {
 import { ArrowLeft, Building2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 import logo from "@/assets/logo.png";
 
 const CreateSociety = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const { updateUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({ name: "", address: "" });
 
@@ -38,15 +37,8 @@ const CreateSociety = () => {
     try {
       const { data } = await api.post("/societies/create", formData);
       if (data.success) {
-        // Update stored user with societyId
-        const user = safeParseJSON<Record<string, unknown>>(localStorage.getItem("user"), {});
-        localStorage.setItem(
-          "user",
-          JSON.stringify({ ...user, societyId: data.data.id }),
-        );
-
-        // Clear React Query cache before navigating so old society data is removed
-        queryClient.clear();
+        // Update stored user with societyId via AuthProvider
+        updateUser({ societyId: data.data.id });
 
         toast.success(`"${formData.name}" created successfully!`);
         navigate("/dashboard/admin");

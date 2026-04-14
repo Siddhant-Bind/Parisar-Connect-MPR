@@ -13,15 +13,17 @@ import {
   Building2,
   Clock,
   Loader2,
+  Activity
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useDashboardStats } from "@/hooks/useQueries";
-import { safeParseJSON } from "@/lib/utils";
+import { useDashboardStats, useRecentActivity } from "@/hooks/useQueries";
+import { useAuth } from "@/context/AuthProvider";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
+  const { user } = useAuth();
   const { data: fetchedStats, isLoading: loading } = useDashboardStats();
+  const { data: recentActivity, isLoading: loadingActivity } = useRecentActivity();
   const stats = fetchedStats || {
     totalResidents: 0,
     openComplaints: 0,
@@ -39,6 +41,7 @@ const AdminDashboard = () => {
       icon: Users,
       trend: `${stats.currentVisitors} visitors active`,
       color: "bg-soft-peach",
+      path: "/dashboard/admin/residents",
     },
     {
       title: "Open Complaints",
@@ -46,6 +49,7 @@ const AdminDashboard = () => {
       icon: Bell,
       trend: `${stats.pendingApprovals} pending approvals`,
       color: "bg-mint-green",
+      path: "/dashboard/admin/complaints",
     },
     {
       title: "Pending Payments",
@@ -53,6 +57,7 @@ const AdminDashboard = () => {
       icon: CreditCard,
       trend: `${stats.collectionRate}% collected`,
       color: "bg-light-yellow",
+      path: "/dashboard/admin/payments",
     },
     {
       title: "Visitors Today",
@@ -60,6 +65,7 @@ const AdminDashboard = () => {
       icon: Shield,
       trend: `${stats.currentVisitors} currently inside`,
       color: "bg-lavender-mist",
+      path: "/dashboard/admin/visitors",
     },
   ];
 
@@ -106,7 +112,8 @@ const AdminDashboard = () => {
             {statCards.map((stat, index) => (
               <Card
                 key={index}
-                className="border-0 shadow-soft hover:shadow-elevated transition-shadow duration-300 rounded-2xl overflow-hidden"
+                onClick={() => navigate(stat.path)}
+                className="border-0 shadow-soft hover:shadow-elevated transition-shadow duration-300 rounded-2xl overflow-hidden cursor-pointer"
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-card/50">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -120,45 +127,52 @@ const AdminDashboard = () => {
                   <div className="text-2xl font-bold text-foreground">
                     {stat.value}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                    {index === 2 ? (
-                      <TrendingUp className="w-3 h-3 text-green-500" />
-                    ) : (
-                      <Clock className="w-3 h-3" />
-                    )}
-                    {stat.trend}
-                  </p>
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
 
-        {/* Pending Approvals */}
+        {/* Recent Activity */}
         <Card className="rounded-2xl border-0 shadow-card animate-fade-in-delay-3">
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-3 border-b border-border/40">
             <CardTitle className="text-lg font-bold flex items-center gap-2">
-              <Clock className="w-5 h-5 text-warm-orange" />
-              Pending Approvals
-              {stats.pendingApprovals > 0 && (
-                <Badge className="bg-warm-orange text-xs ml-2">
-                  {stats.pendingApprovals}
-                </Badge>
-              )}
+              <Activity className="w-5 h-5 text-indigo-500" />
+              Recent Activity
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {stats.pendingApprovals === 0 ? (
-                <p className="text-sm text-muted-foreground p-4 text-center">
-                  No pending approvals.
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground p-4 text-center">
-                  {stats.pendingApprovals} pre-approved visitors awaiting entry.
-                </p>
-              )}
-            </div>
+          <CardContent className="pt-4">
+            {loadingActivity ? (
+              <div className="flex justify-center p-4">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : !recentActivity || recentActivity.length === 0 ? (
+              <p className="text-sm text-muted-foreground p-4 text-center">
+                No recent activity across the society.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {recentActivity.map((activity: { id: string, type: string, title: string, description: string, timestamp: string, icon: string }) => {
+                  const Icon = activity.icon === 'Shield' ? Shield : activity.icon === 'Bell' ? Bell : CreditCard;
+                  const iconColor = activity.icon === 'Shield' ? "text-emerald-500 bg-emerald-50" : activity.icon === 'Bell' ? "text-orange-500 bg-orange-50" : "text-blue-500 bg-blue-50";
+                  
+                  return (
+                    <div key={activity.id} className="flex items-start gap-4 pb-4 last:pb-0 last:border-0 border-b border-border/40">
+                      <div className={`p-2 rounded-full ${iconColor}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p className="text-sm font-medium leading-none text-foreground">{activity.title}</p>
+                        <p className="text-xs text-muted-foreground">{activity.description}</p>
+                      </div>
+                      <div className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                        {new Date(activity.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 

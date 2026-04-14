@@ -15,13 +15,22 @@ import { AddResidentModal } from "@/components/dashboard/AddResidentModal";
 import { toast } from "@/hooks/use-toast";
 import { useResidents } from "@/hooks/useQueries";
 import { useDeleteResident } from "@/hooks/useMutations";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 const Residents = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const limit = 10;
 
-  const { data, isLoading, refetch } = useResidents(page, limit);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const { data, isLoading, refetch } = useResidents(page, limit, debouncedSearch);
   const residents = data?.data || [];
   const totalPages = data?.totalPages || 1;
 
@@ -32,14 +41,9 @@ const Residents = () => {
     deleteResidentMutation.mutate(id);
   };
 
-  const filteredResidents = residents.filter(
-    (resident) =>
-      resident.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      resident.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      resident.flatNumber.includes(searchQuery),
-  );
+  const filteredResidents = residents;
 
-  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
+  const { user } = useAuth();
 
   return (
     <DashboardLayout role="admin" userName={user.name || "Admin"}>

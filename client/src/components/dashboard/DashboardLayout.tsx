@@ -19,8 +19,8 @@ import {
 } from "lucide-react";
 import { ModeToggle } from "@/components/mode-toggle";
 import logo from "@/assets/logo.png";
-import api from "@/lib/api";
 import { NotificationBell } from "./NotificationBell";
+import { useAuth } from "@/context/AuthProvider";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -114,6 +114,7 @@ const DashboardLayout = ({
   const location = useLocation();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const { logout } = useAuth();
   const config = roleConfig[role];
 
   const NavContent = () => (
@@ -189,12 +190,7 @@ const DashboardLayout = ({
           variant="ghost"
           className="w-full justify-start text-muted-foreground hover:text-destructive rounded-xl"
           onClick={async () => {
-            try {
-              await api.post("/auth/logout");
-            } catch {
-              // Ignore logout API errors
-            }
-            localStorage.removeItem("user");
+            await logout();
             navigate("/login");
           }}
         >
@@ -246,11 +242,11 @@ const DashboardLayout = ({
         <div className="hidden lg:flex items-center justify-end p-4 lg:px-8 pb-0">
           <NotificationBell />
         </div>
-        <div className="p-4 lg:p-8 lg:pt-4">{children}</div>
+        <div className="p-4 pb-24 lg:p-8 lg:pt-4 lg:pb-8">{children}</div>
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border px-2 py-2">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border px-1 py-1.5 z-50">
         <div className="flex items-center justify-around">
           {config.navItems.slice(0, 4).map((item) => {
             const isActive = location.pathname === item.path;
@@ -258,15 +254,24 @@ const DashboardLayout = ({
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-colors ${
+                className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-colors min-w-0 ${
                   isActive ? "text-primary" : "text-muted-foreground"
                 }`}
               >
-                <item.icon className="w-5 h-5" />
-                <span className="text-xs font-medium">{item.label}</span>
+                <item.icon className="w-4 h-4" />
+                <span className="text-[10px] font-medium truncate max-w-[60px]">{item.label}</span>
               </Link>
             );
           })}
+          {config.navItems.length > 4 && (
+            <button
+              onClick={() => setIsOpen(true)}
+              className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-colors min-w-0 text-muted-foreground hover:text-foreground"
+            >
+              <Menu className="w-4 h-4" />
+              <span className="text-[10px] font-medium truncate max-w-[60px]">Menu</span>
+            </button>
+          )}
         </div>
       </nav>
     </div>

@@ -39,6 +39,8 @@ const getAllComplaints = asyncHandler(async (req, res) => {
   }
 
   let filter = { societyId: req.user.societyId, deletedAt: null };
+  const search = req.query.search || "";
+
   if (req.user.role === "RESIDENT") {
     // Residents see their own complaints + all GENERAL complaints in the society
     filter = {
@@ -50,6 +52,21 @@ const getAllComplaints = asyncHandler(async (req, res) => {
         },
       ],
     };
+  }
+
+  if (search) {
+    const searchFilter = {
+      OR: [
+        { title: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+      ],
+    };
+
+    if (filter.AND) {
+      filter.AND.push(searchFilter);
+    } else {
+      filter.OR = searchFilter.OR;
+    }
   }
 
   const [complaints, total] = await Promise.all([

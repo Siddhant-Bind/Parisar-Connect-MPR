@@ -27,6 +27,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -35,15 +36,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Payment, User as Resident } from "@/types";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 const Payments = () => {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [residents, setResidents] = useState<Resident[]>([]); // To select resident for payment req
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [residents, setResidents] = useState<Resident[]>([]);
   const [page, setPage] = useState(1);
   const limit = 10;
 
-  const { data, isLoading: loading } = usePayments(page, limit);
+  // Debounce search for server-side filtering
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const { data, isLoading: loading } = usePayments(page, limit, debouncedSearch);
   const payments = data?.data || [];
   const totalPages = data?.totalPages || 1;
 
@@ -52,7 +63,7 @@ const Payments = () => {
 
   const [formData, setFormData] = useState({
     type: "Maintenance",
-    month: new Date().toLocaleString("default", { month: "long" }),
+    month: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`,
     amount: "",
     dueDate: "",
     residentId: "", // "ALL" for bulk, or specific resident ID
@@ -64,15 +75,29 @@ const Payments = () => {
 
   const fetchResidents = async () => {
     try {
-      const res = await api.get("/residents");
-      if (res.data.success) setResidents(res.data.data);
+      // Fetch all residents for the dropdown (backend paginates, so request a large limit)
+      const res = await api.get("/residents?limit=1000");
+      if (res.data.success) {
+        // Backend returns { data: { data: [...], pagination: {...} } }
+        const residentList = res.data.data?.data || res.data.data;
+        setResidents(Array.isArray(residentList) ? residentList : []);
+      }
     } catch (error) {
       console.error(error);
     }
   };
 
   const handleCreate = () => {
-    createPaymentMutation.mutate(formData, {
+    const isBulk = formData.residentId === "ALL";
+    const dueDateISO = new Date(formData.dueDate).toISOString();
+    const payload: Record<string, unknown> = {
+      type: formData.type,
+      amount: Number(formData.amount),
+      dueDate: dueDateISO,
+      month: formData.month || undefined,
+      residentId: isBulk ? "ALL" : formData.residentId,
+    };
+    createPaymentMutation.mutate(payload, {
       onSuccess: () => setOpen(false),
     });
   };
@@ -81,17 +106,10 @@ const Payments = () => {
     markPaidMutation.mutate(id);
   };
 
-  const filteredPayments = payments.filter((p) => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      p.resident?.name?.toLowerCase().includes(searchLower) ||
-      p.resident?.flatNumber?.toLowerCase().includes(searchLower) ||
-      p.type?.toLowerCase().includes(searchLower) ||
-      p.month?.toLowerCase().includes(searchLower)
-    );
-  });
+  // Search is now server-side via the query hook
+  const filteredPayments = payments;
 
-  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
+  const { user } = useAuth();
 
   return (
     <DashboardLayout role="admin" userName={user.name || "Admin"}>
@@ -110,8 +128,10 @@ const Payments = () => {
             </div>
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
-                <Button className="rounded-xl shadow-button btn-press bg-gradient-warm text-white whitespace-nowrap">
-                  <CreditCard className="w-4 h-4 mr-2" /> Request Payment
+                <Button className="rounded-xl shadow-button btn-press bg-gradient-warm text-white whitespace-nowrap text-xs sm:text-sm px-3 sm:px-4">
+                  <CreditCard className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Request Payment</span>
+                  <span className="sm:hidden">Request</span>
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -119,49 +139,73 @@ const Payments = () => {
                   <DialogTitle>Create Valid Payment Request</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <Select
-                    onValueChange={(v) =>
-                      setFormData({ ...formData, residentId: v })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Resident" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem
-                        value="bulk"
-                        className="font-semibold text-primary"
-                      >
-                        All Residents (Bulk)
-                      </SelectItem>
-                      {residents.map((r) => (
-                        <SelectItem key={r.id} value={r.id}>
-                          {r.name} ({r.wing}-{r.flatNumber})
+                  <div className="space-y-2">
+                    <Label>Select Resident</Label>
+                    <Select
+                      onValueChange={(v) =>
+                        setFormData({ ...formData, residentId: v })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Resident" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem
+                          value="ALL"
+                          className="font-semibold text-primary"
+                        >
+                          All Residents (Bulk)
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    placeholder=""
-                    type="number"
-                    onChange={(e) =>
-                      setFormData({ ...formData, amount: e.target.value })
-                    }
-                  />
-                  <Input
-                    placeholder=""
-                    onChange={(e) =>
-                      setFormData({ ...formData, month: e.target.value })
-                    }
-                  />
-                  <Input
-                    type="date"
-                    onChange={(e) =>
-                      setFormData({ ...formData, dueDate: e.target.value })
-                    }
-                  />
-                  <Button onClick={handleCreate} className="w-full">
-                    Create Request
+                        {residents.map((r) => (
+                          <SelectItem key={r.id} value={r.id}>
+                            {r.name} ({r.wing}-{r.flatNumber})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Amount (₹)</Label>
+                    <Input
+                      placeholder="Amount (₹)"
+                      type="number"
+                      onChange={(e) =>
+                        setFormData({ ...formData, amount: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Billing Month</Label>
+                    <Input
+                      type="month"
+                      value={formData.month}
+                      onChange={(e) =>
+                        setFormData({ ...formData, month: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Due Date</Label>
+                    <Input
+                      type="date"
+                      onChange={(e) =>
+                        setFormData({ ...formData, dueDate: e.target.value })
+                      }
+                    />
+                  </div>
+                  <Button
+                    onClick={handleCreate}
+                    className="w-full"
+                    disabled={createPaymentMutation.isPending}
+                  >
+                    {createPaymentMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating...</>
+                    ) : (
+                      "Create Request"
+                    )}
                   </Button>
                 </div>
               </DialogContent>
@@ -222,8 +266,14 @@ const Payments = () => {
                             variant="ghost"
                             className="text-green-600 hover:text-green-700"
                             onClick={() => markPaid(payment.id)}
+                            disabled={markPaidMutation.isPending && markPaidMutation.variables === payment.id}
                           >
-                            <Check className="w-4 h-4 mr-1" /> Mark Paid
+                            {markPaidMutation.isPending && markPaidMutation.variables === payment.id ? (
+                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4 mr-1" />
+                            )}
+                            Mark Paid
                           </Button>
                         )}
                       </TableCell>

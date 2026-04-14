@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -17,13 +17,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 }) => {
   // Hooks must be called unconditionally, before any early returns
   const location = useLocation();
-
-  // Get user from localStorage (set during login)
-  const user = safeParseJSON<{
-    role?: string;
-    societyId?: string;
-    mustChangePassword?: boolean;
-  } | null>(localStorage.getItem("user"), null);
+  const { user } = useAuth();
 
   if (!user) {
     // Not authenticated - redirect to login
@@ -66,4 +60,3 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // User is authenticated and has correct role
   return <>{children}</>;
 };
-

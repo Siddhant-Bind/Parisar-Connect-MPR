@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -42,11 +42,11 @@ export default function TodaysLog() {
   const fetchVisitors = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get("/visitors");
-      const all: Visitor[] = response.data.data || [];
+      const response = await api.get("/visitors?limit=20");
+      const all: Visitor[] = response.data.data?.data || response.data.data || [];
       const today = new Date().toDateString();
       const todaysVisitors = all.filter(
-        (v) => new Date(v.entryTime).toDateString() === today,
+        (v) => v.entryTime && new Date(v.entryTime).toDateString() === today,
       );
       setVisitors(todaysVisitors);
     } catch (error) {
@@ -90,8 +90,7 @@ export default function TodaysLog() {
   const activeCount = filteredVisitors.filter(
     (v) => v.status === "ENTERED",
   ).length;
-  const userName =
-    safeParseJSON<{name?: string}>(localStorage.getItem("user"), {}).name || "Guard";
+  const userName = useAuth().user?.name || "Guard";
 
   return (
     <DashboardLayout role="guard" userName={userName}>
@@ -246,13 +245,13 @@ export default function TodaysLog() {
 
                           {/* Entry */}
                           <TableCell className="text-gray-600 font-medium tabular-nums">
-                            {new Date(visitor.entryTime).toLocaleTimeString(
+                            {visitor.status === "ENTERED" || visitor.status === "EXITED" ? new Date(visitor.entryTime).toLocaleTimeString(
                               [],
                               {
                                 hour: "2-digit",
                                 minute: "2-digit",
                               },
-                            )}
+                            ) : "—"}
                           </TableCell>
 
                           {/* Exit */}

@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Visitor } from "@/types";
 import { useVisitors } from "@/hooks/useQueries";
 import { useCreateVisitor } from "@/hooks/useMutations";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 
 const ResidentVisitors = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -34,13 +34,13 @@ const ResidentVisitors = () => {
     purpose: "Guest",
   });
 
+  const { user } = useAuth();
   const { data, isLoading: loading } = useVisitors(1, 100);
   const visitors = data?.data || [];
   const createVisitorMutation = useCreateVisitor();
 
   const handlePreApprove = (e: React.FormEvent) => {
     e.preventDefault();
-    const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
     createVisitorMutation.mutate(
       {
         name: formData.name,
@@ -58,7 +58,7 @@ const ResidentVisitors = () => {
   };
 
   return (
-    <DashboardLayout role="resident">
+    <DashboardLayout role="resident" userName={user?.name || "Resident"}>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">My Visitors</h1>
@@ -92,7 +92,7 @@ const ResidentVisitors = () => {
                       </TableCell>
                       <TableCell>{visitor.purpose}</TableCell>
                       <TableCell>
-                        {visitor.entryTime
+                        {visitor.status === "ENTERED" || visitor.status === "EXITED"
                           ? new Date(visitor.entryTime).toLocaleString()
                           : "-"}
                       </TableCell>

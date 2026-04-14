@@ -136,25 +136,32 @@ const registerResident = asyncHandler(async (req, res) => {
 const getAllResidents = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
+  const search = req.query.search || "";
   const skip = (page - 1) * limit;
+
+  const whereClause = {
+    role: "RESIDENT",
+    societyId: req.user.societyId,
+    deletedAt: null,
+  };
+
+  if (search) {
+    whereClause.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { email: { contains: search, mode: "insensitive" } },
+      { flatNumber: { contains: search, mode: "insensitive" } },
+    ];
+  }
 
   const [residents, total] = await Promise.all([
     prisma.user.findMany({
-      where: {
-        role: "RESIDENT",
-        societyId: req.user.societyId,
-        deletedAt: null,
-      },
+      where: whereClause,
       skip,
       take: limit,
       orderBy: { createdAt: "desc" },
     }),
     prisma.user.count({
-      where: {
-        role: "RESIDENT",
-        societyId: req.user.societyId,
-        deletedAt: null,
-      },
+      where: whereClause,
     }),
   ]);
 

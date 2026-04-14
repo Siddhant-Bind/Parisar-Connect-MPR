@@ -24,14 +24,14 @@ import { toast } from "sonner";
 import { Complaint } from "@/types";
 import { useComplaints } from "@/hooks/useQueries";
 import { useCreateComplaint } from "@/hooks/useMutations";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 
 const ResidentComplaints = () => {
   const [open, setOpen] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [filterCategory, setFilterCategory] = useState("ALL");
   const [filterOwnership, setFilterOwnership] = useState("ALL");
-  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -81,7 +81,7 @@ const ResidentComplaints = () => {
   };
 
   return (
-    <DashboardLayout role="resident">
+    <DashboardLayout role="resident" userName={user?.name || "Resident"}>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">My Complaints</h1>
@@ -241,13 +241,20 @@ const ResidentComplaints = () => {
                       </Badge>
                     </div>
                   </div>
-                  <Badge variant="secondary">{complaint.status}</Badge>
+                  <Badge className={`font-medium ${
+                      complaint.status === 'REJECTED' ? 'bg-red-500 hover:bg-red-600' : 
+                      complaint.status === 'IN_PROGRESS' ? 'bg-green-400 hover:bg-green-500' : 
+                      complaint.status === 'RESOLVED' ? 'bg-green-600 hover:bg-green-700' : 
+                      'bg-blue-500 hover:bg-blue-600'
+                    }`}>
+                    {complaint.status === 'IN_PROGRESS' ? 'IN PROGRESS' : complaint.status}
+                  </Badge>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground mb-4">
                     {complaint.description}
                   </p>
-                  <div className="flex justify-between items-center text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />{" "}
                       {new Date(complaint.createdAt).toLocaleDateString()}

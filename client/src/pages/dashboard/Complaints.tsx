@@ -27,15 +27,24 @@ import {
 } from "lucide-react";
 import { useComplaints } from "@/hooks/useQueries";
 import { useUpdateComplaintStatus } from "@/hooks/useMutations";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 
 import { Complaint } from "@/types";
 const Complaints = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const limit = 10;
 
-  const { data, isLoading: loading } = useComplaints(page, limit);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const { data, isLoading: loading } = useComplaints(page, limit, debouncedSearch);
   const complaints = data?.data || [];
   const totalPages = data?.totalPages || 1;
 
@@ -45,17 +54,9 @@ const Complaints = () => {
     updateStatusMutation.mutate({ id, status });
   };
 
-  // TODO: Client-side search only filters the current page, not all complaints.
-  // Consider server-side search for complete results.
-  const filteredComplaints = complaints.filter(
-    (c) =>
-      c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.resident?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.resident?.flatNumber.includes(searchQuery),
-  );
+  const filteredComplaints = complaints;
 
-  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
+  const { user } = useAuth();
 
   return (
     <DashboardLayout role="admin" userName={user.name || "Admin"}>
@@ -102,14 +103,24 @@ const Complaints = () => {
                   </div>
                   <Select
                     value={complaint.status}
+                    disabled={updateStatusMutation.isPending && updateStatusMutation.variables?.id === complaint.id}
                     onValueChange={(val) => updateStatus(complaint.id, val)}
                   >
-                    <SelectTrigger className="w-[140px] h-8">
-                      <SelectValue />
+                    <SelectTrigger className={`w-[140px] h-8 font-medium border ${
+                      complaint.status === 'REJECTED' ? 'border-red-500 text-red-700 bg-red-50' : 
+                      complaint.status === 'IN_PROGRESS' ? 'border-green-400 text-green-700 bg-green-50' : 
+                      complaint.status === 'RESOLVED' ? 'border-green-600 text-green-800 bg-green-100' : 
+                      'border-blue-500 text-blue-700 bg-blue-50'
+                    }`}>
+                      {updateStatusMutation.isPending && updateStatusMutation.variables?.id === complaint.id ? (
+                         <div className="flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin"/> Updating...</div>
+                      ) : (
+                         <SelectValue />
+                      )}
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="OPEN">Open</SelectItem>
-                      <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                      <SelectItem value="IN_PROGRESS">IN PROGRESS</SelectItem>
                       <SelectItem value="RESOLVED">Resolved</SelectItem>
                       <SelectItem value="REJECTED">Rejected</SelectItem>
                     </SelectContent>

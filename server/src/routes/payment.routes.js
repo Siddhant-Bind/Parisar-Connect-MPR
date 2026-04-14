@@ -10,6 +10,7 @@ import { checkRole } from "../middleware/rbac.middleware.js";
 import { validate } from "../middleware/validate.middleware.js";
 import {
   createPaymentSchema,
+  createBulkPaymentSchema,
   markPaymentPaidSchema,
 } from "../validators/payment.schema.js";
 import { ROLES } from "../constants.js";
@@ -22,7 +23,7 @@ router
   .route("/")
   .post(
     checkRole([ROLES.ADMIN]),
-    validate(createPaymentSchema), // Note: might need bulk validation schema later
+    validate(createPaymentSchema),
     createPaymentRequest,
   )
   .get(getAllPayments);
@@ -31,7 +32,7 @@ router
   .route("/bulk")
   .post(
     checkRole([ROLES.ADMIN]),
-    validate(createPaymentSchema),
+    validate(createBulkPaymentSchema),
     createBulkPaymentRequest,
   );
 
@@ -40,3 +41,4 @@ router
   .patch(checkRole([ROLES.ADMIN]), validate(markPaymentPaidSchema), markAsPaid);
 
 export default router;
+

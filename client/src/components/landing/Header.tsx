@@ -21,19 +21,14 @@ import {
 import { ModeToggle } from "@/components/mode-toggle";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import api from "@/lib/api";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 import logo from "@/assets/logo.png";
 
 const Header = () => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const { user, logout } = useAuth();
 
-  // Check if a user is logged in via localStorage
-  const user = safeParseJSON<{ name?: string; email?: string; role?: string } | null>(
-    localStorage.getItem("user"),
-    null,
-  );
   const isLoggedIn = Boolean(user);
   const initials = user?.name
     ? user.name
@@ -45,15 +40,9 @@ const Header = () => {
     : "A";
 
   const handleLogout = async () => {
-    try {
-      await api.post("/auth/logout");
-    } catch {
-      // ignore — still clear local state
-    } finally {
-      localStorage.removeItem("user");
-      toast.success("Logged out successfully");
-      navigate("/");
-    }
+    await logout();
+    toast.success("Logged out successfully");
+    navigate("/");
   };
 
   const UserMenu = () => (
@@ -161,21 +150,24 @@ const Header = () => {
         <div className="hidden md:flex items-center gap-2">
           <Button
             variant="ghost"
-            className="text-muted-foreground hover:text-foreground rounded-xl"
+            className="text-muted-foreground hover:text-foreground rounded-xl font-semibold"
+            asChild
           >
-            Features
+            <a href="#features">Features</a>
           </Button>
           <Button
             variant="ghost"
-            className="text-muted-foreground hover:text-foreground rounded-xl"
+            className="text-muted-foreground hover:text-foreground rounded-xl font-semibold"
+            asChild
           >
-            About
+            <a href="#about">About</a>
           </Button>
           <Button
             variant="ghost"
-            className="text-muted-foreground hover:text-foreground rounded-xl"
+            className="text-muted-foreground hover:text-foreground rounded-xl font-semibold"
+            asChild
           >
-            Contact
+            <a href="#contact">Contact</a>
           </Button>
         </div>
 

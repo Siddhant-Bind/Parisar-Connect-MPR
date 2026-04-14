@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -58,7 +58,7 @@ export default function VisitorHistory() {
     try {
       setLoading(true);
       const response = await api.get("/visitors");
-      setVisitors(response.data.data || []);
+      setVisitors(response.data.data?.data || response.data.data || []);
     } catch (error) {
       toast.error("Failed to fetch visitor history");
     } finally {
@@ -81,7 +81,7 @@ export default function VisitorHistory() {
   });
 
   const userName =
-    safeParseJSON<{name?: string}>(localStorage.getItem("user"), {}).name || "Guard";
+    useAuth().user?.name || "Guard";
 
   return (
     <DashboardLayout role="guard" userName={userName}>
@@ -225,24 +225,30 @@ export default function VisitorHistory() {
                           {/* Entry Date + Time */}
                           <TableCell className="text-gray-600 text-sm">
                             <div className="flex flex-col">
-                              <span className="font-medium">
-                                {new Date(visitor.entryTime).toLocaleDateString(
-                                  "en-IN",
-                                  {
-                                    day: "numeric",
-                                    month: "short",
-                                  },
-                                )}
-                              </span>
-                              <span className="text-xs text-gray-400 tabular-nums">
-                                {new Date(visitor.entryTime).toLocaleTimeString(
-                                  [],
-                                  {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  },
-                                )}
-                              </span>
+                              {(visitor.status === "ENTERED" || visitor.status === "EXITED") ? (
+                                <>
+                                  <span className="font-medium">
+                                    {new Date(visitor.entryTime).toLocaleDateString(
+                                      "en-IN",
+                                      {
+                                        day: "numeric",
+                                        month: "short",
+                                      },
+                                    )}
+                                  </span>
+                                  <span className="text-xs text-gray-400 tabular-nums">
+                                    {new Date(visitor.entryTime).toLocaleTimeString(
+                                      [],
+                                      {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      },
+                                    )}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="font-medium text-gray-400">—</span>
+                              )}
                             </div>
                           </TableCell>
 

@@ -37,7 +37,7 @@ export default function GuardVisitors() {
     try {
       setLoading(true);
       const response = await api.get("/visitors");
-      setVisitors(response.data.data);
+      setVisitors(response.data.data?.data || response.data.data || []);
     } catch (error) {
       toast.error("Failed to fetch visitors");
     } finally {
@@ -182,7 +182,7 @@ function VisitorTable({
               </TableCell>
               <TableCell>{visitor.purpose}</TableCell>
               <TableCell>
-                {new Date(visitor.entryTime).toLocaleTimeString()}
+                {visitor.status === "ENTERED" || visitor.status === "EXITED" ? new Date(visitor.entryTime).toLocaleTimeString() : "—"}
               </TableCell>
               <TableCell>
                 {showExitAction && onExit ? (

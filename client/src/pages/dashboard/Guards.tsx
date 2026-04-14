@@ -15,7 +15,7 @@ import { AddGuardModal } from "@/components/dashboard/AddGuardModal";
 import { toast } from "@/hooks/use-toast";
 import { useGuards } from "@/hooks/useQueries";
 import { useDeleteGuard } from "@/hooks/useMutations";
-import { safeParseJSON } from "@/lib/utils";
+import { useAuth } from "@/context/AuthProvider";
 const Guards = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -39,7 +39,7 @@ const Guards = () => {
       guard.contact.includes(searchQuery),
   );
 
-  const user = safeParseJSON(localStorage.getItem("user"), {} as Record<string, any>);
+  const { user } = useAuth();
 
   return (
     <DashboardLayout role="admin" userName={user.name || "Admin"}>

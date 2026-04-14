@@ -36,9 +36,8 @@ const logVisitorEntry = asyncHandler(async (req, res) => {
       status,
       documentImage: isResident ? null : documentImage || null,
       isWalkIn: !isResident,
-      enteredBy: req.user.id,
-      entryTime: isResident ? null : new Date(), // Only walk-ins get immediate entryTime
-      societyId: req.user.societyId,
+      creator: { connect: { id: req.user.id } },
+      society: { connect: { id: req.user.societyId } },
     },
   });
 
@@ -81,10 +80,8 @@ const logVisitorExit = asyncHandler(async (req, res) => {
   if (!visitor) throw new ApiError(404, "Visitor log not found");
   if (visitor.societyId !== req.user.societyId)
     throw new ApiError(403, "Access denied");
-  if (visitor.status === "EXITED")
-    throw new ApiError(400, "Visitor has already exited");
-  if (visitor.status === "APPROVED")
-    throw new ApiError(400, "Visitor has not entered the premises yet");
+  if (visitor.status !== "ENTERED")
+    throw new ApiError(400, `Cannot mark exit for visitor with status: ${visitor.status}`);
 
   const updated = await prisma.visitor.update({
     where: { id },
@@ -102,10 +99,19 @@ const getAllVisitors = asyncHandler(async (req, res) => {
   const skip = (page - 1) * limit;
 
   const filter = { societyId: req.user.societyId, deletedAt: null };
+  const search = req.query.search || "";
 
   if (req.user.role === "RESIDENT") {
     filter.wing = req.user.wing;
     filter.flatNumber = req.user.flatNumber;
+  }
+
+  if (search) {
+    filter.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { purpose: { contains: search, mode: "insensitive" } },
+      { flatNumber: { contains: search, mode: "insensitive" } },
+    ];
   }
 
   const [visitors, total] = await Promise.all([
@@ -184,7 +190,7 @@ const updateVisitorStatus = asyncHandler(async (req, res) => {
   }
 
   const dataToUpdate = { status };
-  if (status === "ENTERED" && !visitor.entryTime) {
+  if (status === "ENTERED" && (!visitor.entryTime || visitor.status === "APPROVED")) {
     dataToUpdate.entryTime = new Date();
   }
 

@@ -1,10 +1,23 @@
 import { z } from "zod";
 import { PAYMENT_STATUS } from "../constants.js";
 
-// Create Payment Request Schema
+// Create Payment Request Schema (single resident)
 export const createPaymentSchema = z.object({
   body: z.object({
     residentId: z.string().uuid("Invalid resident ID"),
+    amount: z.number().positive("Amount must be greater than 0"),
+    type: z.string().min(2, "Payment type is required").max(100),
+    dueDate: z.string().datetime("Invalid due date format"),
+    month: z
+      .string()
+      .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Month must be in YYYY-MM format")
+      .optional(),
+  }),
+});
+
+// Create Bulk Payment Request Schema (no residentId needed)
+export const createBulkPaymentSchema = z.object({
+  body: z.object({
     amount: z.number().positive("Amount must be greater than 0"),
     type: z.string().min(2, "Payment type is required").max(100),
     dueDate: z.string().datetime("Invalid due date format"),
@@ -21,3 +34,4 @@ export const markPaymentPaidSchema = z.object({
     id: z.string().uuid("Invalid payment ID"),
   }),
 });
+

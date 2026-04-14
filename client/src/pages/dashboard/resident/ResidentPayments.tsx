@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, CreditCard } from "lucide-react";
 import { toast } from "sonner";
-import api from "@/lib/api";
+import { usePayments } from "@/hooks/useQueries";
+import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -14,48 +14,35 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-interface Payment {
-  id: string;
-  type: string;
-  month: string;
-  amount: number;
-  dueDate: string;
-  status: "PENDING" | "PAID" | "OVERDUE";
-}
+import { useAuth } from "@/context/AuthProvider";
 
 const ResidentPayments = () => {
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const limit = 10;
 
-  useEffect(() => {
-    fetchPayments();
-  }, []);
-
-  const fetchPayments = async () => {
-    try {
-      const res = await api.get("/payments");
-      if (res.data.success) setPayments(res.data.data);
-    } catch (error) {
-      toast.error("Failed to fetch payments");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data, isLoading: loading } = usePayments(page, limit);
+  const payments = data?.data || [];
+  const totalPages = data?.totalPages || 1;
 
   const handlePay = (id: string) => {
-    // In a real app, this would redirect to a payment gateway
+    if (payingId) return; // Already processing
+    setPayingId(id);
     toast.info("Redirecting to Payment Gateway...");
+    // Lock the button for 3 seconds to prevent duplicate clicks
+    setTimeout(() => setPayingId(null), 3000);
   };
 
+  const { user } = useAuth();
+
   return (
-    <DashboardLayout role="resident">
+    <DashboardLayout role="resident" userName={user.name || "Resident"}>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">My Payments & Dues</h1>
+        <h1 className="text-3xl font-bold">My Payments &amp; Dues</h1>
 
         <Card className="shadow-soft border-0">
           <CardHeader>
-            <CardTitle>Maintenance & Bill History</CardTitle>
+            <CardTitle>Maintenance &amp; Bill History</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -98,10 +85,17 @@ const ResidentPayments = () => {
                         {payment.status === "PENDING" && (
                           <Button
                             size="sm"
-                            className="bg-gradient-warm text-white shadow-button"
+                            className="bg-gradient-warm text-white shadow-button text-xs sm:text-sm px-2 sm:px-3"
                             onClick={() => handlePay(payment.id)}
+                            disabled={payingId === payment.id}
                           >
-                            <CreditCard className="w-4 h-4 mr-2" /> Pay Now
+                            {payingId === payment.id ? (
+                              <Loader2 className="w-4 h-4 mr-1 sm:mr-2 animate-spin" />
+                            ) : (
+                              <CreditCard className="w-4 h-4 mr-1 sm:mr-2" />
+                            )}
+                            <span className="hidden sm:inline">Pay Now</span>
+                            <span className="sm:hidden">Pay</span>
                           </Button>
                         )}
                       </TableCell>
@@ -119,6 +113,31 @@ const ResidentPayments = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-end space-x-2 py-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1 || loading}
+            >
+              Previous
+            </Button>
+            <div className="text-sm text-muted-foreground w-20 text-center">
+              Page {page} of {totalPages}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages || loading}
+            >
+              Next
+            </Button>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

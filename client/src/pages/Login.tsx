@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,10 +14,11 @@ import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import api from "@/lib/api";
 import logo from "@/assets/logo.png";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthProvider";
 
 const Login = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,27 +32,12 @@ const Login = () => {
       if (data.success) {
         const user = data.data.user;
 
-        // Clear query cache to ensure no data bleeds from previous session
-        queryClient.clear();
-
-        // Store tokens first so the API interceptor can attach the Bearer token
-        localStorage.setItem("accessToken", data.data.accessToken);
-        localStorage.setItem("refreshToken", data.data.refreshToken);
-
-        // Fetch and attach society info (now authenticated via token)
-        if (user.societyId) {
-          try {
-            const societyRes = await api.get("/societies");
-            const society = societyRes.data.data?.find(
-              (s: { id: string }) => s.id === user.societyId,
-            );
-            user.society = society || null;
-          } catch {
-            // Non-blocking — society name is optional for login
-          }
-        }
-
-        localStorage.setItem("user", JSON.stringify(user));
+        // Use the centralized auth context to store tokens + user
+        login({
+          user,
+          accessToken: data.data.accessToken,
+          refreshToken: data.data.refreshToken,
+        });
 
         // Enforce first-login password change
         if (user.mustChangePassword) {

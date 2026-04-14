@@ -40,6 +40,11 @@ api.interceptors.response.use(
         window.location.href = "/login";
       }
     }
+    if (error.response?.data?.message) {
+      error.message = error.response.data.message;
+    } else if (error.message?.includes("status code")) {
+      error.message = `Something went wrong (Error ${error.response?.status || 500})`;
+    }
     return Promise.reject(error);
   },
 );
