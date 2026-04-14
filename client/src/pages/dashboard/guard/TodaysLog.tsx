@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthProvider";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ import { LogOut, Search, RefreshCw, Clock, CheckCircle2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useVisitors } from "@/hooks/useQueries";
 
 interface Visitor {
   id: string;
@@ -34,44 +35,26 @@ interface Visitor {
 }
 
 export default function TodaysLog() {
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
-  const [loading, setLoading] = useState(true);
   const [exiting, setExiting] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const { user } = useAuth();
 
-  const fetchVisitors = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await api.get("/visitors?limit=20");
-      const all: Visitor[] = response.data.data?.data || response.data.data || [];
-      const today = new Date().toDateString();
-      const todaysVisitors = all.filter(
-        (v) => v.entryTime && new Date(v.entryTime).toDateString() === today,
-      );
-      setVisitors(todaysVisitors);
-    } catch (error) {
-      toast.error("Failed to fetch today's logs");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // Debounce search to prevent excessive API calls
   useEffect(() => {
-    fetchVisitors();
-  }, [fetchVisitors]);
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const { data: visitorsResponse, isLoading: loading, refetch } = useVisitors(1, 200, debouncedSearch, "", "today");
+  const visitors = useMemo(() => (visitorsResponse?.data || []) as Visitor[], [visitorsResponse]);
 
   const handleExit = async (id: string) => {
     setExiting(id);
     try {
       await api.patch(`/visitors/${id}/exit`);
       toast.success("Visitor marked as exited");
-      setVisitors((prev) =>
-        prev.map((v) =>
-          v.id === id
-            ? { ...v, status: "EXITED", exitTime: new Date().toISOString() }
-            : v,
-        ),
-      );
+      refetch();
     } catch (error) {
       toast.error("Failed to mark exit");
     } finally {
@@ -79,18 +62,16 @@ export default function TodaysLog() {
     }
   };
 
-  const filteredVisitors = visitors.filter(
-    (v) =>
-      v.name.toLowerCase().includes(search.toLowerCase()) ||
-      v.flatNumber.includes(search) ||
-      v.wing.toLowerCase().includes(search.toLowerCase()) ||
-      v.purpose.toLowerCase().includes(search.toLowerCase()),
+  const activeCount = useMemo(
+    () => visitors.filter((v) => v.status === "ENTERED").length,
+    [visitors],
+  );
+  const exitedCount = useMemo(
+    () => visitors.filter((v) => v.status === "EXITED").length,
+    [visitors],
   );
 
-  const activeCount = filteredVisitors.filter(
-    (v) => v.status === "ENTERED",
-  ).length;
-  const userName = useAuth().user?.name || "Guard";
+  const userName = user?.name || "Guard";
 
   return (
     <DashboardLayout role="guard" userName={userName}>
@@ -112,8 +93,8 @@ export default function TodaysLog() {
           <Button
             variant="outline"
             size="sm"
-            className="gap-2 rounded-xl"
-            onClick={fetchVisitors}
+            className="gap-2 rounded-xl border-border bg-background hover:bg-muted"
+            onClick={() => refetch()}
             disabled={loading}
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -123,22 +104,22 @@ export default function TodaysLog() {
 
         {/* Summary Badges */}
         <div className="flex flex-wrap gap-3">
-          <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-full">
-            <Clock className="h-4 w-4 text-blue-600" />
-            <span className="text-sm font-semibold text-blue-700">
+          <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full">
+            <Clock className="h-4 w-4 text-blue-500" />
+            <span className="text-sm font-semibold text-blue-500 dark:text-blue-400">
               {visitors.length} Total Today
             </span>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-full">
+          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-sm font-semibold text-emerald-700">
+            <span className="text-sm font-semibold text-emerald-500 dark:text-emerald-400">
               {activeCount} Currently Inside
             </span>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-full">
-            <CheckCircle2 className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-semibold text-gray-600">
-              {visitors.filter((v) => v.status === "EXITED").length} Exited
+          <div className="flex items-center gap-2 px-4 py-2 bg-gray-500/10 border border-gray-500/20 rounded-full">
+            <CheckCircle2 className="h-4 w-4 text-gray-400" />
+            <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+              {exitedCount} Exited
             </span>
           </div>
         </div>
@@ -147,36 +128,36 @@ export default function TodaysLog() {
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder=""
+            placeholder="Search visitors..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 h-12 bg-white shadow-sm border-gray-200 focus:border-emerald-500 rounded-xl"
+            className="pl-10 h-12 bg-background shadow-sm border-border focus:border-emerald-500 rounded-xl"
           />
         </div>
 
         {/* Table */}
-        <Card className="border-none shadow-xl bg-white/50 backdrop-blur-sm">
+        <Card className="border-none shadow-xl bg-card backdrop-blur-sm">
           <CardContent className="p-0">
-            <div className="rounded-xl overflow-hidden border border-gray-100">
+            <div className="rounded-xl overflow-hidden border border-border">
               <Table>
-                <TableHeader className="bg-gray-50/80">
+                <TableHeader className="bg-muted/80">
                   <TableRow>
-                    <TableHead className="font-semibold text-gray-600">
+                    <TableHead className="font-semibold text-muted-foreground">
                       Visitor
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-600">
+                    <TableHead className="font-semibold text-muted-foreground">
                       Unit
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-600">
+                    <TableHead className="font-semibold text-muted-foreground">
                       Purpose / Type
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-600">
+                    <TableHead className="font-semibold text-muted-foreground">
                       Entry
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-600">
+                    <TableHead className="font-semibold text-muted-foreground">
                       Exit
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-600 text-right">
+                    <TableHead className="font-semibold text-muted-foreground text-right">
                       Action
                     </TableHead>
                   </TableRow>
@@ -194,26 +175,26 @@ export default function TodaysLog() {
                     ))
                   ) : (
                     <>
-                      {filteredVisitors.map((visitor) => (
+                      {visitors.map((visitor) => (
                         <TableRow
                           key={visitor.id}
-                          className={`hover:bg-emerald-50/30 transition-colors ${
+                          className={`hover:bg-emerald-500/10 transition-colors ${
                             visitor.status === "EXITED" ? "opacity-60" : ""
                           }`}
                         >
                           {/* Visitor Name */}
                           <TableCell>
                             <div className="flex flex-col gap-0.5">
-                              <span className="font-semibold text-gray-900">
+                              <span className="font-semibold text-foreground">
                                 {visitor.name}
                               </span>
                               {visitor.contact && (
-                                <span className="text-xs text-gray-400">
+                                <span className="text-xs text-muted-foreground">
                                   {visitor.contact}
                                 </span>
                               )}
                               {visitor.documentImage && (
-                                <span className="inline-flex w-fit items-center gap-1 mt-0.5 text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 font-medium">
+                                <span className="inline-flex w-fit items-center gap-1 mt-0.5 text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 dark:text-blue-400 font-medium">
                                   📷 Doc Scanned
                                 </span>
                               )}
@@ -222,7 +203,7 @@ export default function TodaysLog() {
 
                           {/* Unit */}
                           <TableCell>
-                            <Badge className="font-mono text-xs bg-gray-100 text-gray-700 hover:bg-gray-100 border-none">
+                            <Badge className="font-mono text-xs bg-muted text-muted-foreground border-none">
                               {visitor.wing}-{visitor.flatNumber}
                             </Badge>
                           </TableCell>
@@ -230,11 +211,11 @@ export default function TodaysLog() {
                           {/* Purpose + Type */}
                           <TableCell>
                             <div className="flex flex-col gap-1">
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 font-medium w-fit">
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-500 dark:text-orange-400 font-medium w-fit">
                                 {visitor.purpose}
                               </span>
                               {visitor.visitorType && (
-                                <span className="text-[10px] text-gray-400">
+                                <span className="text-[10px] text-muted-foreground">
                                   {visitor.visitorType}
                                   {visitor.vehicleNumber &&
                                     ` · ${visitor.vehicleNumber}`}
@@ -244,18 +225,21 @@ export default function TodaysLog() {
                           </TableCell>
 
                           {/* Entry */}
-                          <TableCell className="text-gray-600 font-medium tabular-nums">
-                            {visitor.status === "ENTERED" || visitor.status === "EXITED" ? new Date(visitor.entryTime).toLocaleTimeString(
-                              [],
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
-                            ) : "—"}
+                          <TableCell className="text-muted-foreground font-medium tabular-nums">
+                            {visitor.status === "ENTERED" ||
+                            visitor.status === "EXITED"
+                              ? new Date(visitor.entryTime).toLocaleTimeString(
+                                  [],
+                                  {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  },
+                                )
+                              : "—"}
                           </TableCell>
 
                           {/* Exit */}
-                          <TableCell className="text-gray-500 tabular-nums">
+                          <TableCell className="text-muted-foreground tabular-nums">
                             {visitor.exitTime
                               ? new Date(visitor.exitTime).toLocaleTimeString(
                                   [],
@@ -273,7 +257,7 @@ export default function TodaysLog() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="bg-red-50 text-red-600 hover:bg-red-100 border-red-200"
+                                className="bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20"
                                 disabled={exiting === visitor.id}
                                 onClick={() => handleExit(visitor.id)}
                               >
@@ -281,7 +265,7 @@ export default function TodaysLog() {
                                 {exiting === visitor.id ? "..." : "Mark Exit"}
                               </Button>
                             ) : (
-                              <Badge className="bg-gray-100 text-gray-500 border-none hover:bg-gray-100">
+                              <Badge className="bg-muted text-muted-foreground border-none">
                                 Exited
                               </Badge>
                             )}
@@ -289,12 +273,12 @@ export default function TodaysLog() {
                         </TableRow>
                       ))}
 
-                      {filteredVisitors.length === 0 && (
+                      {visitors.length === 0 && (
                         <TableRow>
                           <TableCell colSpan={6} className="text-center py-12">
                             <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                              <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
-                                <Clock className="h-6 w-6 text-gray-400" />
+                              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                                <Clock className="h-6 w-6 text-muted-foreground" />
                               </div>
                               <p className="font-medium">
                                 No logs for today yet

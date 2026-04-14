@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useVisitors } from "@/hooks/useQueries";
+import { useVisitors, useGuardStats } from "@/hooks/useQueries";
 import { Visitor } from "@/types";
 
 const statusConfig = {
@@ -32,19 +32,19 @@ const statusConfig = {
 export default function GuardDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: visitorsResponse, isLoading: loading } = useVisitors(1, 5);
+  const { data: visitorsResponse, isLoading: loadingVisitors } = useVisitors(1, 5);
+  const { data: guardStats, isLoading: loadingStats } = useGuardStats();
 
   const visitors = useMemo(
     () => visitorsResponse?.data ?? [],
     [visitorsResponse],
   ) as Visitor[];
 
-  // Compute stats from real visitor data
-  const today = new Date().toDateString();
-  const visitorsToday = visitors.filter(
-    (v) => v.entryTime && new Date(v.entryTime).toDateString() === today,
-  );
-  const currentlyInside = visitors.filter((v) => v.status === "ENTERED");
+  const visitorsTodayCount = guardStats?.totalEntriesToday || 0;
+  const currentlyInsideCount = guardStats?.currentlyInside || 0;
+  const totalHistoryCount = guardStats?.totalHistory || 0;
+  const loading = loadingStats || loadingVisitors;
+
   const recentVisitors = [...visitors]
     .sort(
       (a, b) =>
@@ -72,9 +72,9 @@ export default function GuardDashboard() {
               })}
             </p>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-full">
+          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-sm font-semibold text-emerald-700">
+            <span className="text-sm font-semibold text-emerald-500">
               On Duty
             </span>
           </div>
@@ -123,7 +123,7 @@ export default function GuardDashboard() {
                   </div>
                   <div className="space-y-1">
                     <h3 className="text-4xl font-bold text-foreground">
-                      {loading ? "..." : visitorsToday.length}
+                      {loadingStats ? <Skeleton className="h-10 w-20" /> : visitorsTodayCount}
                     </h3>
                     <p className="text-sm text-blue-500 font-medium">
                       Total Entries
@@ -144,7 +144,7 @@ export default function GuardDashboard() {
                   </div>
                   <div className="space-y-1">
                     <h3 className="text-4xl font-bold text-foreground">
-                      {loading ? "..." : currentlyInside.length}
+                      {loadingStats ? <Skeleton className="h-10 w-20" /> : currentlyInsideCount}
                     </h3>
                     <p className="text-sm text-emerald-500 font-medium">
                       Currently Inside
@@ -169,9 +169,9 @@ export default function GuardDashboard() {
                     <div>
                       <h4 className="font-bold text-foreground">Today's Log</h4>
                       <p className="text-sm text-muted-foreground">
-                        {loading
-                          ? "..."
-                          : `${visitorsToday.length} entries · ${currentlyInside.length} still inside`}
+                        {loadingStats
+                          ? <Skeleton className="h-4 w-32 mt-1" />
+                          : `${visitorsTodayCount} entries · ${currentlyInsideCount} still inside`}
                       </p>
                     </div>
                     <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground/40 group-hover:text-emerald-500 transition-colors" />
@@ -189,7 +189,7 @@ export default function GuardDashboard() {
                     <div>
                       <h4 className="font-bold text-foreground">Full History</h4>
                       <p className="text-sm text-muted-foreground">
-                        {loading ? "..." : `${visitors.length} total records`}
+                        {loadingStats ? <Skeleton className="h-4 w-24 mt-1" /> : `${totalHistoryCount} total records`}
                       </p>
                     </div>
                     <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground/40 group-hover:text-purple-500 transition-colors" />

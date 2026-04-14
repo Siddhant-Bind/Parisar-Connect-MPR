@@ -6,6 +6,7 @@ import {
   getVisitorById,
   updateVisitorStatus,
   deleteVisitor,
+  getGuardStats,
 } from "../controllers/visitor.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { checkRole } from "../middleware/rbac.middleware.js";
@@ -17,6 +18,9 @@ const router = Router();
 
 // All visitor routes require authentication
 router.use(verifyJWT);
+
+// GET /visitors/stats/guard -> Fetch fast counts
+router.get("/stats/guard", checkRole([ROLES.GUARD, ROLES.ADMIN]), getGuardStats);
 
 // POST /visitors  → Guard, Admin, and Resident (pre-approval)
 // GET  /visitors  → All roles (controller filters by role)

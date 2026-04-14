@@ -81,7 +81,10 @@ const logVisitorExit = asyncHandler(async (req, res) => {
   if (visitor.societyId !== req.user.societyId)
     throw new ApiError(403, "Access denied");
   if (visitor.status !== "ENTERED")
-    throw new ApiError(400, `Cannot mark exit for visitor with status: ${visitor.status}`);
+    throw new ApiError(
+      400,
+      `Cannot mark exit for visitor with status: ${visitor.status}`,
+    );
 
   const updated = await prisma.visitor.update({
     where: { id },
@@ -104,6 +107,21 @@ const getAllVisitors = asyncHandler(async (req, res) => {
   if (req.user.role === "RESIDENT") {
     filter.wing = req.user.wing;
     filter.flatNumber = req.user.flatNumber;
+  }
+
+  if (req.query.status && req.query.status !== "ALL") {
+    const statuses = req.query.status.split(",");
+    if (statuses.length === 1) {
+      filter.status = statuses[0];
+    } else {
+      filter.status = { in: statuses };
+    }
+  }
+
+  if (req.query.date === "today") {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    filter.entryTime = { gte: today };
   }
 
   if (search) {
@@ -190,7 +208,10 @@ const updateVisitorStatus = asyncHandler(async (req, res) => {
   }
 
   const dataToUpdate = { status };
-  if (status === "ENTERED" && (!visitor.entryTime || visitor.status === "APPROVED")) {
+  if (
+    status === "ENTERED" &&
+    (!visitor.entryTime || visitor.status === "APPROVED")
+  ) {
     dataToUpdate.entryTime = new Date();
   }
 
@@ -223,6 +244,35 @@ const deleteVisitor = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "Visitor record deleted"));
 });
 
+// GET /visitors/guard-stats
+const getGuardStats = asyncHandler(async (req, res) => {
+  const sid = req.user.societyId;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const [totalEntriesToday, currentlyInside, totalHistory] = await Promise.all([
+    prisma.visitor.count({
+      where: { societyId: sid, entryTime: { gte: today }, deletedAt: null },
+    }),
+    prisma.visitor.count({
+      where: { societyId: sid, status: "ENTERED", deletedAt: null },
+    }),
+    prisma.visitor.count({
+      where: { societyId: sid, deletedAt: null },
+    }),
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { totalEntriesToday, currentlyInside, totalHistory },
+        "Guard stats fetched",
+      ),
+    );
+});
+
 export {
   logVisitorEntry,
   logVisitorExit,
@@ -230,4 +280,5 @@ export {
   getVisitorById,
   updateVisitorStatus,
   deleteVisitor,
+  getGuardStats,
 };

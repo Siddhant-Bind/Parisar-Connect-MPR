@@ -52,9 +52,11 @@ const ResidentNotices = () => {
                   <div className="flex items-center gap-2">
                     <CardTitle>{notice.title}</CardTitle>
                     <span
-                      className={`text-xs px-2 py-1 rounded-full ${
+                      className={`text-xs px-2 py-1 rounded-full font-medium ${
                         notice.type === "ALERT"
                           ? "bg-red-100 text-red-700"
+                          : notice.type === "EVENT"
+                          ? "bg-purple-100 text-purple-700 border border-purple-200"
                           : "bg-blue-100 text-blue-700"
                       }`}
                     >
@@ -74,19 +76,41 @@ const ResidentNotices = () => {
                       <Megaphone className="w-3 h-3" /> Priority:{" "}
                       {notice.priority}
                     </span>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="link" size="sm" className="h-auto p-0 text-primary font-semibold">View</Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>{notice.title}</DialogTitle>
-                        </DialogHeader>
-                        <div className="mt-4 whitespace-pre-wrap text-sm text-foreground/90 max-h-[60vh] overflow-y-auto">
-                          {notice.content}
-                        </div>
-                      </DialogContent>
-                    </Dialog>
+                    <div className="flex items-center gap-3">
+                      {notice.type === "EVENT" && notice.eventLink && (
+                        <Button 
+                          size="sm" 
+                          variant="default"
+                          className="bg-purple-600 hover:bg-purple-700 text-white rounded-md px-4"
+                          onClick={() => window.open(notice.eventLink, "_blank")}
+                        >
+                          Register
+                        </Button>
+                      )}
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="link" size="sm" className="h-auto p-0 text-primary font-semibold">View</Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>{notice.title}</DialogTitle>
+                          </DialogHeader>
+                          <div className="mt-4 whitespace-pre-wrap text-sm text-foreground/90 max-h-[60vh] overflow-y-auto">
+                            {notice.content}
+                          </div>
+                          {notice.type === "EVENT" && notice.eventLink && (
+                            <div className="mt-4 flex justify-end gap-2 border-t pt-4">
+                              <Button 
+                                className="bg-purple-600 hover:bg-purple-700"
+                                onClick={() => window.open(notice.eventLink, "_blank")}
+                              >
+                                Register Now
+                              </Button>
+                            </div>
+                          )}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

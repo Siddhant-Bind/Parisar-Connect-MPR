@@ -15,6 +15,26 @@ export const createNoticeSchema = z.object({
     priority: z
       .enum([NOTICE_PRIORITY.LOW, NOTICE_PRIORITY.MEDIUM, NOTICE_PRIORITY.HIGH])
       .default(NOTICE_PRIORITY.LOW),
+    visibility: z.enum(["PRIVATE", "PUBLIC"]).default("PRIVATE").optional(),
+    eventLink: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+    targetSocieties: z.array(z.string().uuid("Invalid territory ID")).optional().default([]),
+  }).superRefine((data, ctx) => {
+    if (data.type === NOTICE_TYPE.EVENT) {
+      if (!data.eventLink || data.eventLink.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["eventLink"],
+          message: "Event registration link is required for Event notices",
+        });
+      }
+      if (data.visibility === "PUBLIC" && (!data.targetSocieties || data.targetSocieties.length === 0)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["targetSocieties"],
+          message: "Please select at least one society for public events",
+        });
+      }
+    }
   }),
 });
 
@@ -32,6 +52,29 @@ export const updateNoticeSchema = z.object({
     priority: z
       .enum([NOTICE_PRIORITY.LOW, NOTICE_PRIORITY.MEDIUM, NOTICE_PRIORITY.HIGH])
       .optional(),
+    visibility: z.enum(["PRIVATE", "PUBLIC"]).optional(),
+    eventLink: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+    targetSocieties: z.array(z.string().uuid("Invalid territory ID")).optional(),
+  }).superRefine((data, ctx) => {
+    if (data.type === NOTICE_TYPE.EVENT) {
+      // In updates, we don't strictly require these if they are not provided 
+      // but if we are switching to public event, we check.
+      // Usually the FE sends all fields for update anyway.
+      if (data.eventLink !== undefined && data.eventLink.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["eventLink"],
+          message: "Event registration link cannot be empty",
+        });
+      }
+      if (data.visibility === "PUBLIC" && data.targetSocieties && data.targetSocieties.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["targetSocieties"],
+          message: "Please select at least one society for public events",
+        });
+      }
+    }
   }),
 });
 

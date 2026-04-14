@@ -46,6 +46,11 @@ enum PaymentStatus {
   OVERDUE
 }
 
+enum NoticeVisibility {
+  PRIVATE
+  PUBLIC
+}
+
 enum VisitorStatus {
   PENDING
   APPROVED
@@ -122,6 +127,11 @@ model Notice {
   content   String
   type      NoticeType     @default(INFO)
   priority  NoticePriority @default(LOW)
+  
+  // Event-specific fields
+  visibility      NoticeVisibility @default(PRIVATE)
+  eventLink       String?
+  targetSocieties String[]
   
   // Society relation
   societyId String
@@ -226,6 +236,8 @@ model Visitor {
   updatedAt     DateTime @updatedAt
 
   @@index([societyId, entryTime])
+  @@index([societyId, status, deletedAt])
+  @@index([societyId, status, entryTime])
   @@index([status])
   @@index([isWalkIn])
   @@index([deletedAt])
@@ -248,6 +260,7 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@index([userId, isRead])
+  @@index([userId, createdAt(sort: Desc)])
   @@index([societyId])
   @@map("notifications")
 }

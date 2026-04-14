@@ -4,7 +4,7 @@ import { ApiResponse } from "../utils/apiResponse.js";
 import prisma from "../db/prisma.js";
 
 const createNotice = asyncHandler(async (req, res) => {
-  const { title, content, type, priority } = req.body;
+  const { title, content, type, priority, visibility, eventLink, targetSocieties } = req.body;
 
   if (!title || !content) {
     throw new ApiError(400, "Title and content are required");
@@ -17,13 +17,21 @@ const createNotice = asyncHandler(async (req, res) => {
       type: type || "INFO",
       priority: priority || "LOW",
       societyId: req.user.societyId,
+      visibility: visibility || "PRIVATE",
+      eventLink: eventLink || null,
+      targetSocieties: targetSocieties || [],
     },
   });
 
-  // Notify all residents
+  // Notify residents in target societies
+  const societyIdsToNotify = [req.user.societyId];
+  if (type === "EVENT" && visibility === "PUBLIC" && targetSocieties && targetSocieties.length > 0) {
+    societyIdsToNotify.push(...targetSocieties);
+  }
+
   const residents = await prisma.user.findMany({
-    where: { societyId: req.user.societyId, role: "RESIDENT", deletedAt: null },
-    select: { id: true },
+    where: { societyId: { in: societyIdsToNotify }, role: "RESIDENT", deletedAt: null },
+    select: { id: true, societyId: true },
   });
 
   if (residents.length > 0) {
@@ -34,7 +42,7 @@ const createNotice = asyncHandler(async (req, res) => {
           content.substring(0, 100) + (content.length > 100 ? "..." : ""),
         type: "NOTICE",
         userId: r.id,
-        societyId: req.user.societyId,
+        societyId: r.societyId,
       })),
     });
   }
@@ -50,12 +58,26 @@ const getAllNotices = asyncHandler(async (req, res) => {
   const skip = (page - 1) * limit;
   const search = req.query.search || "";
 
-  const whereClause = { societyId: req.user.societyId, deletedAt: null };
+  const whereClause = {
+    deletedAt: null,
+    OR: [
+      { societyId: req.user.societyId },
+      {
+        type: "EVENT",
+        visibility: "PUBLIC",
+        targetSocieties: { has: req.user.societyId },
+      },
+    ],
+  };
 
   if (search) {
-    whereClause.OR = [
-      { title: { contains: search, mode: "insensitive" } },
-      { content: { contains: search, mode: "insensitive" } },
+    whereClause.AND = [
+      {
+        OR: [
+          { title: { contains: search, mode: "insensitive" } },
+          { content: { contains: search, mode: "insensitive" } },
+        ],
+      },
     ];
   }
 
@@ -103,7 +125,7 @@ const getNoticeById = asyncHandler(async (req, res) => {
 // PATCH or PUT /notices/:id  (Admin only — enforced at route level)
 const updateNotice = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { title, content, type, priority } = req.body;
+  const { title, content, type, priority, visibility, eventLink, targetSocieties } = req.body;
 
   const existing = await prisma.notice.findUnique({ where: { id } });
   if (!existing || existing.deletedAt) throw new ApiError(404, "Notice not found");
@@ -112,7 +134,15 @@ const updateNotice = asyncHandler(async (req, res) => {
 
   const notice = await prisma.notice.update({
     where: { id },
-    data: { title, content, type, priority },
+    data: { 
+      title, 
+      content, 
+      type, 
+      priority,
+      visibility,
+      eventLink,
+      targetSocieties
+    },
   });
   return res
     .status(200)

@@ -27,8 +27,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Notice } from "@/types";
-import { useNotices } from "@/hooks/useQueries";
+import { useNotices, useSocieties } from "@/hooks/useQueries";
 import { useCreateNotice, useDeleteNotice } from "@/hooks/useMutations";
 import { useAuth } from "@/context/AuthProvider";
 
@@ -52,9 +56,13 @@ const Notices = () => {
     content: "",
     type: "INFO",
     priority: "MEDIUM",
+    visibility: "PRIVATE",
+    eventLink: "",
+    targetSocieties: [] as string[],
   });
 
   const { data, isLoading: loading } = useNotices(page, limit, debouncedSearch);
+  const { data: societies } = useSocieties();
   const notices = data?.data || [];
   const totalPages = data?.totalPages || 1;
 
@@ -70,6 +78,9 @@ const Notices = () => {
           content: "",
           type: "INFO",
           priority: "MEDIUM",
+          visibility: "PRIVATE",
+          eventLink: "",
+          targetSocieties: [],
         });
       },
     });
@@ -123,14 +134,14 @@ const Notices = () => {
                       setFormData({ ...formData, content: e.target.value })
                     }
                   />
-                  <div className="flex gap-4">
+                  <div className="flex gap-4 w-full">
                     <Select
                       value={formData.type}
                       onValueChange={(v) =>
                         setFormData({ ...formData, type: v })
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="flex-1">
                         <SelectValue placeholder="Type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -145,7 +156,7 @@ const Notices = () => {
                         setFormData({ ...formData, priority: v })
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="flex-1">
                         <SelectValue placeholder="Priority" />
                       </SelectTrigger>
                       <SelectContent>
@@ -155,6 +166,67 @@ const Notices = () => {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {formData.type === "EVENT" && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                      <Input
+                        placeholder="Event Registration Link (URL)"
+                        type="url"
+                        value={formData.eventLink}
+                        onChange={(e) =>
+                          setFormData({ ...formData, eventLink: e.target.value })
+                        }
+                      />
+                      <Select
+                        value={formData.visibility}
+                        onValueChange={(v) =>
+                          setFormData({ ...formData, visibility: v })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Visibility" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PRIVATE">Private (Only this Society)</SelectItem>
+                          <SelectItem value="PUBLIC">Public (Cross-Society)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      {formData.visibility === "PUBLIC" && (
+                        <div className="space-y-2 border rounded-md p-3">
+                          <span className="text-sm font-medium">Target Societies</span>
+                          <p className="text-xs text-muted-foreground">Select societies where this event should be visible.</p>
+                          <ScrollArea className="h-32 border rounded-md p-2">
+                            {societies?.filter(s => s.id !== user.societyId).map((society) => (
+                              <div key={society.id} className="flex items-center space-x-2 py-1.5">
+                                <Checkbox 
+                                  id={society.id} 
+                                  checked={formData.targetSocieties.includes(society.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setFormData(prev => ({...prev, targetSocieties: [...prev.targetSocieties, society.id]}));
+                                    } else {
+                                      setFormData(prev => ({...prev, targetSocieties: prev.targetSocieties.filter(id => id !== society.id)}));
+                                    }
+                                  }}
+                                />
+                                <label
+                                  htmlFor={society.id}
+                                  className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {society.name}
+                                </label>
+                              </div>
+                            ))}
+                            {(!societies || societies.filter(s => s.id !== user.societyId).length === 0) && (
+                              <p className="text-xs text-muted-foreground p-2">No other active societies available.</p>
+                            )}
+                          </ScrollArea>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <Button
                     onClick={handleCreate}
                     disabled={createNoticeMutation.isPending}

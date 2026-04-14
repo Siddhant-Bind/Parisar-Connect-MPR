@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthProvider";
 import { toast } from "sonner";
@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/dialog";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useVisitors } from "@/hooks/useQueries";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface Visitor {
   id: string;
@@ -40,45 +42,34 @@ interface Visitor {
 }
 
 const statusStyles: Record<string, string> = {
-  ENTERED: "bg-emerald-100 text-emerald-700",
-  EXITED: "bg-gray-100 text-gray-600",
-  PENDING: "bg-yellow-100 text-yellow-700",
-  APPROVED: "bg-blue-100 text-blue-700",
+  ENTERED: "bg-emerald-500/10 text-emerald-500",
+  EXITED: "bg-gray-500/10 text-muted-foreground",
+  PENDING: "bg-yellow-500/10 text-yellow-500",
+  APPROVED: "bg-blue-500/10 text-blue-500",
 };
 
 export default function VisitorHistory() {
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState<string>("");
 
-  const fetchVisitors = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await api.get("/visitors");
-      setVisitors(response.data.data?.data || response.data.data || []);
-    } catch (error) {
-      toast.error("Failed to fetch visitor history");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Debounce search to prevent excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
-    fetchVisitors();
-  }, [fetchVisitors]);
+    setPage(1);
+  }, [debouncedSearch, statusFilter]);
 
-  const filteredVisitors = visitors.filter((v) => {
-    const matchesSearch =
-      v.name.toLowerCase().includes(search.toLowerCase()) ||
-      v.flatNumber.includes(search) ||
-      v.wing.toLowerCase().includes(search.toLowerCase()) ||
-      v.purpose.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === "ALL" || v.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const actualStatus = statusFilter === "ALL" ? "" : statusFilter;
+  const { data: visitorsResponse, isLoading: loading } = useVisitors(page, 15, debouncedSearch, actualStatus);
+  const filteredVisitors = useMemo(() => (visitorsResponse?.data || []) as Visitor[], [visitorsResponse]);
+  const totalPages = visitorsResponse?.totalPages || 1;
 
   const userName =
     useAuth().user?.name || "Guard";
@@ -105,7 +96,7 @@ export default function VisitorHistory() {
               placeholder=""
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 h-12 bg-white shadow-sm border-gray-200 focus:border-purple-500 rounded-xl"
+              className="pl-10 h-12 bg-background shadow-sm border-border focus:border-purple-500 rounded-xl"
             />
           </div>
 
@@ -119,50 +110,44 @@ export default function VisitorHistory() {
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   statusFilter === s
                     ? "bg-purple-600 text-white shadow"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >
                 {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
               </button>
             ))}
-            <Badge
-              variant="outline"
-              className="h-8 px-3 rounded-full bg-purple-50 text-purple-700 border-purple-200 ml-1"
-            >
-              {filteredVisitors.length} records
-            </Badge>
           </div>
         </div>
 
         {/* Table */}
-        <Card className="border-none shadow-xl bg-white/50 backdrop-blur-sm">
+        <Card className="border-none shadow-xl bg-card backdrop-blur-sm">
           <CardContent className="p-0">
-            <div className="rounded-xl overflow-hidden border border-gray-100">
+            <div className="rounded-xl overflow-hidden border border-border">
               <Table>
-                <TableHeader className="bg-gray-50/80">
+                <TableHeader className="bg-muted/50">
                   <TableRow>
-                    <TableHead className="font-semibold text-gray-600">
+                    <TableHead className="font-semibold text-muted-foreground">
                       Visitor
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-600">
+                    <TableHead className="font-semibold text-muted-foreground">
                       Unit
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-600">
+                    <TableHead className="font-semibold text-muted-foreground">
                       Purpose / Type
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-600">
+                    <TableHead className="font-semibold text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <CalendarDays className="h-3.5 w-3.5" />
                         Entry
                       </div>
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-600">
+                    <TableHead className="font-semibold text-muted-foreground">
                       Exit
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-600">
+                    <TableHead className="font-semibold text-muted-foreground">
                       Doc
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-600 text-right">
+                    <TableHead className="font-semibold text-muted-foreground text-right">
                       Status
                     </TableHead>
                   </TableRow>
@@ -183,16 +168,16 @@ export default function VisitorHistory() {
                       {filteredVisitors.map((visitor) => (
                         <TableRow
                           key={visitor.id}
-                          className="hover:bg-purple-50/20 transition-colors"
+                          className="hover:bg-purple-500/10 transition-colors"
                         >
                           {/* Visitor Info */}
                           <TableCell>
                             <div className="flex flex-col gap-0.5">
-                              <span className="font-semibold text-gray-900 text-sm">
+                              <span className="font-semibold text-foreground text-sm">
                                 {visitor.name}
                               </span>
                               {visitor.contact && (
-                                <span className="text-xs text-gray-400">
+                                <span className="text-xs text-muted-foreground">
                                   {visitor.contact}
                                 </span>
                               )}
@@ -201,7 +186,7 @@ export default function VisitorHistory() {
 
                           {/* Unit */}
                           <TableCell>
-                            <Badge className="font-mono text-xs bg-gray-100 text-gray-700 hover:bg-gray-100 border-none">
+                            <Badge className="font-mono text-xs bg-muted text-muted-foreground border-none">
                               {visitor.wing}-{visitor.flatNumber}
                             </Badge>
                           </TableCell>
@@ -209,11 +194,11 @@ export default function VisitorHistory() {
                           {/* Purpose + Type */}
                           <TableCell>
                             <div className="flex flex-col gap-1">
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 font-medium w-fit">
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-500 font-medium w-fit">
                                 {visitor.purpose}
                               </span>
                               {visitor.visitorType && (
-                                <span className="text-[10px] text-gray-400">
+                                <span className="text-[10px] text-muted-foreground">
                                   {visitor.visitorType}
                                   {visitor.vehicleNumber &&
                                     ` · ${visitor.vehicleNumber}`}
@@ -223,11 +208,11 @@ export default function VisitorHistory() {
                           </TableCell>
 
                           {/* Entry Date + Time */}
-                          <TableCell className="text-gray-600 text-sm">
+                          <TableCell className="text-muted-foreground text-sm">
                             <div className="flex flex-col">
                               {(visitor.status === "ENTERED" || visitor.status === "EXITED") ? (
                                 <>
-                                  <span className="font-medium">
+                                  <span className="font-medium text-foreground">
                                     {new Date(visitor.entryTime).toLocaleDateString(
                                       "en-IN",
                                       {
@@ -236,7 +221,7 @@ export default function VisitorHistory() {
                                       },
                                     )}
                                   </span>
-                                  <span className="text-xs text-gray-400 tabular-nums">
+                                  <span className="text-xs tabular-nums text-muted-foreground">
                                     {new Date(visitor.entryTime).toLocaleTimeString(
                                       [],
                                       {
@@ -247,13 +232,13 @@ export default function VisitorHistory() {
                                   </span>
                                 </>
                               ) : (
-                                <span className="font-medium text-gray-400">—</span>
+                                <span className="font-medium text-muted-foreground">—</span>
                               )}
                             </div>
                           </TableCell>
 
                           {/* Exit Time */}
-                          <TableCell className="text-gray-500 tabular-nums text-sm">
+                          <TableCell className="text-muted-foreground tabular-nums text-sm">
                             {visitor.exitTime
                               ? new Date(visitor.exitTime).toLocaleTimeString(
                                   [],
@@ -273,13 +258,13 @@ export default function VisitorHistory() {
                                   setPreviewImage(visitor.documentImage!);
                                   setPreviewName(visitor.name);
                                 }}
-                                className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-50 text-blue-600 text-xs font-medium hover:bg-blue-100 transition-colors"
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-500/10 text-blue-500 text-xs font-medium hover:bg-blue-500/20 transition-colors"
                               >
                                 <ImageIcon className="h-3 w-3" />
                                 View
                               </button>
                             ) : (
-                              <span className="text-xs text-gray-300">—</span>
+                              <span className="text-xs text-muted-foreground">—</span>
                             )}
                           </TableCell>
 
@@ -288,7 +273,7 @@ export default function VisitorHistory() {
                             <span
                               className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                                 statusStyles[visitor.status] ||
-                                "bg-gray-100 text-gray-600"
+                                "bg-muted text-muted-foreground"
                               }`}
                             >
                               {visitor.status}
@@ -301,8 +286,8 @@ export default function VisitorHistory() {
                         <TableRow>
                           <TableCell colSpan={7} className="text-center py-16">
                             <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                              <div className="h-12 w-12 rounded-full bg-purple-50 flex items-center justify-center">
-                                <Search className="h-6 w-6 text-purple-300" />
+                              <div className="h-12 w-12 rounded-full bg-purple-500/10 flex items-center justify-center">
+                                <Search className="h-6 w-6 text-purple-500" />
                               </div>
                               <p className="font-medium">No visitors found</p>
                               <p className="text-sm">
@@ -330,6 +315,33 @@ export default function VisitorHistory() {
                 </TableBody>
               </Table>
             </div>
+            {/* Pagination Controls */}
+            {!loading && filteredVisitors.length > 0 && totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-4 border-t border-border">
+                <p className="text-sm text-muted-foreground">
+                  Page <span className="font-semibold text-foreground">{page}</span> of{" "}
+                  <span className="font-semibold text-foreground">{totalPages}</span>
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" /> Prev
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    Next <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

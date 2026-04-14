@@ -11,6 +11,13 @@ export interface User {
   createdAt: string;
 }
 
+// Society Types
+export interface Society {
+  id: string;
+  name: string;
+  address?: string;
+}
+
 // Notice Types
 export interface Notice {
   id: string;
@@ -18,6 +25,9 @@ export interface Notice {
   content: string;
   type: "INFO" | "EVENT" | "ALERT";
   priority: "LOW" | "MEDIUM" | "HIGH";
+  visibility?: "PRIVATE" | "PUBLIC";
+  eventLink?: string;
+  targetSocieties?: string[];
   createdAt: string;
   creatorId?: string;
   societyId?: string;

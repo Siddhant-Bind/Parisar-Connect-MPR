@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/context/AuthProvider";
+import { useVisitors } from "@/hooks/useQueries";
 
 interface Visitor {
   id: string;
@@ -29,47 +30,30 @@ interface Visitor {
 }
 
 export default function PreApprovedVisitors() {
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const { user } = useAuth();
 
-  const fetchVisitors = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get("/visitors");
-      const visitorsList: Visitor[] = response.data.data?.data || response.data.data || [];
-      const approved = visitorsList.filter(
-        (v: Visitor) => v.status === "APPROVED",
-      );
-      setVisitors(approved);
-    } catch (error) {
-      toast.error("Failed to fetch pre-approved visitors");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Debounce search to prevent excessive API calls
   useEffect(() => {
-    fetchVisitors();
-  }, []);
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const { data: visitorsResponse, isLoading: loading, refetch } = useVisitors(1, 100, debouncedSearch, "APPROVED");
+  const visitors = useMemo(() => (visitorsResponse?.data || []) as Visitor[], [visitorsResponse]);
 
   const handleCheckIn = async (id: string) => {
     try {
       await api.patch(`/visitors/${id}/status`, { status: "ENTERED" });
       toast.success("Visitor checked in successfully");
-      fetchVisitors();
+      refetch();
     } catch (error) {
       toast.error("Failed to check in visitor");
     }
   };
 
-  const filteredVisitors = visitors.filter(
-    (v) =>
-      v.name.toLowerCase().includes(search.toLowerCase()) ||
-      v.flatNumber.includes(search) ||
-      v.wing.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filteredVisitors = visitors;
 
   const userName = user?.name || "Guard";
 
@@ -92,38 +76,38 @@ export default function PreApprovedVisitors() {
               placeholder="Search by name, wing or flat..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 h-12 bg-white shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+              className="pl-10 h-12 bg-background shadow-sm border-border focus:border-blue-500 focus:ring-blue-500 rounded-xl"
             />
           </div>
           <div className="flex gap-2">
             <Badge
               variant="outline"
-              className="h-9 px-4 rounded-lg bg-blue-50 text-blue-700 border-blue-200"
+              className="h-9 px-4 rounded-lg bg-blue-500/10 text-blue-500 dark:text-blue-400 border-blue-500/20"
             >
               {filteredVisitors.length} Expected
             </Badge>
           </div>
         </div>
 
-        <Card className="border-none shadow-xl bg-white/50 backdrop-blur-sm">
+        <Card className="border-none shadow-xl bg-card backdrop-blur-sm">
           <CardContent className="p-0">
-            <div className="rounded-xl overflow-hidden border border-gray-100">
+            <div className="rounded-xl overflow-hidden border border-border">
               <Table>
-                <TableHeader className="bg-gray-50/50">
+                <TableHeader className="bg-muted/50">
                   <TableRow>
-                    <TableHead className="font-semibold text-gray-600">
+                    <TableHead className="font-semibold text-muted-foreground">
                       Visitor Name
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-600">
+                    <TableHead className="font-semibold text-muted-foreground">
                       Unit
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-600">
+                    <TableHead className="font-semibold text-muted-foreground">
                       Purpose
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-600">
+                    <TableHead className="font-semibold text-muted-foreground">
                       Expected
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-600 text-right">
+                    <TableHead className="font-semibold text-muted-foreground text-right">
                       Action
                     </TableHead>
                   </TableRow>
@@ -138,10 +122,18 @@ export default function PreApprovedVisitors() {
                             <Skeleton className="h-4 w-24" />
                           </div>
                         </TableCell>
-                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                        <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-16" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-20" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-20" />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Skeleton className="h-8 w-24 ml-auto" />
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
@@ -149,11 +141,11 @@ export default function PreApprovedVisitors() {
                       {filteredVisitors.map((visitor) => (
                         <TableRow
                           key={visitor.id}
-                          className="hover:bg-blue-50/30 transition-colors"
+                          className="hover:bg-blue-500/10 transition-colors"
                         >
-                          <TableCell className="font-medium text-gray-900">
+                          <TableCell className="font-medium text-foreground">
                             <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
+                              <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 dark:text-blue-400 font-bold text-xs">
                                 {visitor.name.charAt(0)}
                               </div>
                               {visitor.name}
@@ -162,17 +154,17 @@ export default function PreApprovedVisitors() {
                           <TableCell>
                             <Badge
                               variant="secondary"
-                              className="font-mono text-xs bg-gray-100 text-gray-700"
+                              className="font-mono text-xs bg-muted text-muted-foreground"
                             >
                               {visitor.wing}-{visitor.flatNumber}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-500 dark:text-indigo-400">
                               {visitor.purpose}
                             </span>
                           </TableCell>
-                          <TableCell className="text-gray-500">
+                          <TableCell className="text-muted-foreground">
                             {new Date(visitor.entryTime).toLocaleDateString()}
                           </TableCell>
                           <TableCell className="text-right">
@@ -193,7 +185,7 @@ export default function PreApprovedVisitors() {
                             className="text-center py-16 text-muted-foreground"
                           >
                             <div className="flex flex-col items-center gap-3">
-                              <div className="h-16 w-16 rounded-full bg-blue-50 flex items-center justify-center mb-1">
+                              <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-1">
                                 <ClipboardList className="h-8 w-8 text-blue-400" />
                               </div>
                               <p className="font-semibold text-base text-foreground">

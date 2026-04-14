@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { Notice, Complaint, Visitor, Payment, User, Notification } from "@/types";
+import { Notice, Complaint, Visitor, Payment, User, Notification, Society } from "@/types";
 
 export interface PaginatedResponse<T> {
   success: boolean;
@@ -51,15 +51,19 @@ export const useComplaints = (page = 1, limit = 10, search = "") => {
   });
 };
 
-export const useVisitors = (page = 1, limit = 10, search = "") => {
+export const useVisitors = (page = 1, limit = 10, search = "", status = "", date = "") => {
   return useQuery({
-    queryKey: ["visitors", page, limit, search],
+    queryKey: ["visitors", page, limit, search, status, date],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (search) params.append("search", search);
+      if (status) params.append("status", status);
+      if (date) params.append("date", date);
       const { data } = await api.get<GenericResponse<Visitor>>(`/visitors?${params}`);
       return extractData(data);
     },
+    staleTime: 10_000, // Reuse cached data for 10s — avoids redundant fetches
+    placeholderData: (prev) => prev, // Keep showing old data while new data loads
     refetchInterval: 15000,
   });
 };
@@ -96,6 +100,17 @@ export const useGuards = (page = 1, limit = 10) => {
       const { data } = await api.get<GenericResponse<User>>(`/admins?page=${page}&limit=${limit}`);
       return extractData(data);
     },
+  });
+};
+
+export const useGuardStats = () => {
+  return useQuery({
+    queryKey: ["guardStats"],
+    queryFn: async () => {
+      const { data } = await api.get("/visitors/stats/guard");
+      return data.data;
+    },
+    refetchInterval: 15000,
   });
 };
 
@@ -158,5 +173,16 @@ export const useReportStats = () => {
       const { data } = await api.get("/reports/stats");
       return data.data;
     },
+  });
+};
+
+export const useSocieties = () => {
+  return useQuery({
+    queryKey: ["societies"],
+    queryFn: async () => {
+      const { data } = await api.get<{ success: boolean; data: Society[] }>("/societies");
+      return data.data;
+    },
+    staleTime: 60000,
   });
 };

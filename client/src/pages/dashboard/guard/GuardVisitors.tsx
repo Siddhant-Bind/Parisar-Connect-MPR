@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LogOut, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useVisitors } from "@/hooks/useQueries";
 
 interface Visitor {
   id: string;
@@ -29,50 +30,21 @@ interface Visitor {
 }
 
 export default function GuardVisitors() {
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("active");
 
-  const fetchVisitors = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get("/visitors");
-      setVisitors(response.data.data?.data || response.data.data || []);
-    } catch (error) {
-      toast.error("Failed to fetch visitors");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchVisitors();
-  }, []);
+  const statusQuery = activeTab === "active" ? "ENTERED,PENDING" : "EXITED";
+  const { data: visitorsResponse, refetch } = useVisitors(1, 200, search, statusQuery);
+  const visitors = (visitorsResponse?.data || []) as Visitor[];
 
   const handleExit = async (id: string) => {
     try {
-      await api.patch(`/visitors/${id}/exit`); // Assumes route exits, need to check visitor routes
+      await api.patch(`/visitors/${id}/exit`);
       toast.success("Visitor marked as exited");
-      fetchVisitors();
+      refetch();
     } catch (error) {
       toast.error("Failed to mark exit");
     }
-  };
-
-  // Filter visitors
-  const activeVisitors = visitors.filter(
-    (v) => v.status === "ENTERED" || v.status === "PENDING",
-  );
-  const historyVisitors = visitors.filter((v) => v.status === "EXITED");
-
-  const filterBySearch = (list: Visitor[]) => {
-    if (!search) return list;
-    return list.filter(
-      (v) =>
-        v.name.toLowerCase().includes(search.toLowerCase()) ||
-        v.flatNumber.includes(search) ||
-        v.wing.toLowerCase().includes(search.toLowerCase()),
-    );
   };
 
   return (
@@ -87,30 +59,31 @@ export default function GuardVisitors() {
       </div>
 
       <div className="flex items-center gap-2 max-w-sm">
-        <Search className="h-4 w-4 text-gray-500" />
+        <Search className="h-4 w-4 text-muted-foreground" />
         <Input
           placeholder=""
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          className="bg-background border-border"
         />
       </div>
 
-      <Tabs defaultValue="active" className="space-y-4">
+      <Tabs defaultValue="active" onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="active">
-            Active ({activeVisitors.length})
+            Active
           </TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="active">
-          <Card>
+          <Card className="bg-card">
             <CardHeader>
               <CardTitle>Currently Inside</CardTitle>
             </CardHeader>
             <CardContent>
               <VisitorTable
-                visitors={filterBySearch(activeVisitors)}
+                visitors={visitors}
                 onExit={handleExit}
                 showExitAction
               />
@@ -119,12 +92,12 @@ export default function GuardVisitors() {
         </TabsContent>
 
         <TabsContent value="history">
-          <Card>
+          <Card className="bg-card">
             <CardHeader>
               <CardTitle>Visitor History</CardTitle>
             </CardHeader>
             <CardContent>
-              <VisitorTable visitors={filterBySearch(historyVisitors)} />
+              <VisitorTable visitors={visitors} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -144,14 +117,14 @@ function VisitorTable({
 }) {
   if (visitors.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">No visitors found.</div>
+      <div className="text-center py-8 text-muted-foreground">No visitors found.</div>
     );
   }
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-md border border-border">
       <Table>
-        <TableHeader>
+        <TableHeader className="bg-muted/50">
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Flat</TableHead>
@@ -166,12 +139,12 @@ function VisitorTable({
         </TableHeader>
         <TableBody>
           {visitors.map((visitor) => (
-            <TableRow key={visitor.id}>
+            <TableRow key={visitor.id} className="hover:bg-muted/50">
               <TableCell className="font-medium">
                 <div className="flex flex-col">
                   <span>{visitor.name}</span>
                   {visitor.documentImage && (
-                    <span className="text-[10px] text-blue-500">
+                    <span className="text-[10px] text-blue-500 dark:text-blue-400">
                       Doc Scanned
                     </span>
                   )}
@@ -181,7 +154,7 @@ function VisitorTable({
                 {visitor.wing}-{visitor.flatNumber}
               </TableCell>
               <TableCell>{visitor.purpose}</TableCell>
-              <TableCell>
+              <TableCell className="text-muted-foreground">
                 {visitor.status === "ENTERED" || visitor.status === "EXITED" ? new Date(visitor.entryTime).toLocaleTimeString() : "—"}
               </TableCell>
               <TableCell>

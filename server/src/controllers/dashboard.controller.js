@@ -21,6 +21,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     visitorsToday,
     currentVisitors,
     pendingApprovals,
+    societyData,
   ] = await Promise.all([
     prisma.user.count({
       where: { role: "RESIDENT", societyId: sid, deletedAt: null },
@@ -47,6 +48,10 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     prisma.visitor.count({
       where: { status: "APPROVED", societyId: sid, deletedAt: null },
     }),
+    prisma.society.findUnique({
+      where: { id: sid },
+      select: { name: true }
+    }),
   ]);
 
   // Calculate collection rate
@@ -67,6 +72,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     visitorsToday,
     currentVisitors,
     pendingApprovals,
+    societyName: societyData?.name || "Your Society",
   };
 
   return res
@@ -115,7 +121,7 @@ const getRecentActivity = asyncHandler(async (req, res) => {
       id: c.id,
       type: 'COMPLAINT',
       title: `Complaint: ${c.title}`,
-      description: `${c.status} | By ${c.resident?.wing}-${c.resident?.flatNumber} (${c.resident?.name})`,
+      description: `${c.status.replace("_", " ")} | By ${c.resident?.wing}-${c.resident?.flatNumber} (${c.resident?.name})`,
       timestamp: c.updatedAt,
       icon: 'Bell'
     })),

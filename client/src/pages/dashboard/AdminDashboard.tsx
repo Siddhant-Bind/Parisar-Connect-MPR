@@ -80,7 +80,7 @@ const AdminDashboard = () => {
             </h1>
             <p className="text-muted-foreground flex items-center gap-2">
               <Building2 className="w-4 h-4" />
-              {user.society?.name || "Your Society"}
+              {stats.societyName || user.society?.name || "Your Society"}
             </p>
           </div>
           <div className="flex items-center gap-2">
