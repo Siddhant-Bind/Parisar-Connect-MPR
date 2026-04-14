@@ -87,6 +87,11 @@ const getAllNotices = asyncHandler(async (req, res) => {
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
+      include: {
+        society: {
+          select: { name: true },
+        },
+      },
     }),
     prisma.notice.count({
       where: whereClause,

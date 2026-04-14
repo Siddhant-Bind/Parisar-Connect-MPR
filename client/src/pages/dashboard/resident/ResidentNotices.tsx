@@ -15,27 +15,87 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Loader2, Megaphone } from "lucide-react";
+import { Loader2, Megaphone, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { Notice } from "@/types";
 import { useNotices } from "@/hooks/useQueries";
 import { useAuth } from "@/context/AuthProvider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useMemo } from "react";
 
 const ResidentNotices = () => {
   const { data, isLoading: loading } = useNotices(1, 100);
   const notices = data?.data || [];
 
   const { user } = useAuth();
+  
+  const [filterType, setFilterType] = useState<string>("ALL");
+  const [filterSociety, setFilterSociety] = useState<string>("ALL");
+
+  const uniqueSocieties = useMemo(() => {
+    const list = new Map();
+    notices.forEach((n: Notice) => {
+      if (n.societyId && n.society?.name) {
+        list.set(n.societyId, n.society.name);
+      }
+    });
+    return Array.from(list.entries()).map(([id, name]) => ({ id, name }));
+  }, [notices]);
+
+  const filteredNotices = useMemo(() => {
+    return notices.filter((n: Notice) => {
+      const typeMatch = filterType === "ALL" || n.type === filterType;
+      const societyMatch = filterSociety === "ALL" || n.societyId === filterSociety;
+      return typeMatch && societyMatch;
+    });
+  }, [notices, filterType, filterSociety]);
+
   return (
     <DashboardLayout role="resident" userName={user?.name || "Resident"}>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Notices & Announcements</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h1 className="text-3xl font-bold">Notices & Announcements</h1>
+          
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Categories</SelectItem>
+                <SelectItem value="INFO">Info</SelectItem>
+                <SelectItem value="EVENT">Event</SelectItem>
+                <SelectItem value="ALERT">Alert</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterSociety} onValueChange={setFilterSociety}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Society" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Societies</SelectItem>
+                {uniqueSocieties.map((soc) => (
+                  <SelectItem key={soc.id} value={soc.id}>{soc.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
         {loading ? (
           <Loader2 className="animate-spin mx-auto" />
         ) : (
           <div className="grid gap-4">
-            {notices.map((notice) => (
+            {filteredNotices.map((notice: Notice) => (
               <Card
                 key={notice.id}
                 className="shadow-soft hover:shadow-elevated transition-all border-l-4"
@@ -62,6 +122,11 @@ const ResidentNotices = () => {
                     >
                       {notice.type}
                     </span>
+                    {notice.societyId !== user.societyId && notice.society?.name && (
+                      <span className="text-xs px-2 py-1 rounded-full font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                        {notice.society.name}
+                      </span>
+                    )}
                   </div>
                   <CardDescription>
                     {new Date(notice.createdAt).toLocaleDateString()}
@@ -115,9 +180,9 @@ const ResidentNotices = () => {
                 </CardContent>
               </Card>
             ))}
-            {notices.length === 0 && (
+            {filteredNotices.length === 0 && (
               <p className="text-center text-muted-foreground">
-                No notices posted yet.
+                No notices found.
               </p>
             )}
           </div>

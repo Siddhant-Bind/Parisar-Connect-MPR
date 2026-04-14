@@ -31,6 +31,9 @@ export interface Notice {
   createdAt: string;
   creatorId?: string;
   societyId?: string;
+  society?: {
+    name: string;
+  };
 }
 
 // Complaint Types

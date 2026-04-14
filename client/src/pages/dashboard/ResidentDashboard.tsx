@@ -55,8 +55,11 @@ const ResidentDashboard = () => {
       (sum: number, p: Payment) => sum + p.amount,
       0,
     );
+    const eventsCount = (noticesResp?.data ?? []).filter(
+      (n: Notice) => n.type === "EVENT",
+    ).length;
 
-    return { noticesCount, visitorsToday, dueAmount, eventsCount: 0 };
+    return { noticesCount, visitorsToday, dueAmount, eventsCount };
   }, [noticesResp, visitorsResp, paymentsResp]);
 
   if (loading) {
@@ -133,7 +136,7 @@ const ResidentDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-0 shadow-card bg-soft-peach/30">
+          <Card onClick={() => navigate("/dashboard/resident/notices")} className="rounded-2xl border-0 shadow-card bg-soft-peach/30 cursor-pointer hover:shadow-elevated transition-shadow">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-deep-navy/10 flex items-center justify-center">
