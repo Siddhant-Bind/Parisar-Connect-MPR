@@ -7,7 +7,6 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    allowedHosts: ["messenger-mode-decide-homeless.trycloudflare.com"],
     port: 8080,
     hmr: {
       overlay: false,

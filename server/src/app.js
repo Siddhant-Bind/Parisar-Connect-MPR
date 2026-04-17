@@ -11,7 +11,7 @@ configureSecurity(app);
 // 🔒 CORS Configuration with validation
 const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(",").map((origin) => origin.trim())
-  : ["http://localhost:5173"];
+  : ["http://localhost:8080"];
 
 app.use(
   cors({
